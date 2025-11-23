@@ -1,0 +1,125 @@
+// lib/services/task_service.dart (UPDATED - Firebase users managed by CreateTaskScreen via AuthService)
+import 'package:flutter/material.dart';
+import '../models/user_model.dart';
+
+class TaskService extends ChangeNotifier {
+  // Cache for user names to avoid repeated lookups
+  final Map<String, String> _userNameCache = {};
+
+  // Set user name cache from Firebase users
+  void setUserNames(Map<String, String> userNames) {
+    _userNameCache.clear();
+    _userNameCache.addAll(userNames);
+  }
+
+  // Getter for a user's name (used by Leaderboard)
+  String getUserName(String userId) {
+    // Return cached name or default
+    return _userNameCache[userId] ?? 'User';
+  } // 1. IN-MEMORY TASK DATA STORE (Simulated Backend)
+
+  final List<Task> _tasks = [];
+
+  // --- READ OPERATIONS (Omitting for brevity, remains the same) ---
+
+  List<Task> getAllTasks() => _tasks;
+
+  List<Task> getTasksByAssignee(String userId) {
+    return _tasks
+        .where((task) => task.assignee == userId || task.creator == userId)
+        .toList();
+  }
+
+  List<Task> getPendingReviewTasks() =>
+      _tasks.where((task) => task.status == 'pending').toList();
+
+  List<Task> getRecentTasks(String userId) {
+    final userTasks = getTasksByAssignee(userId);
+    userTasks.sort((a, b) => b.dueDate.compareTo(a.dueDate));
+    return userTasks.take(3).toList();
+  }
+
+  Map<String, int> getTaskCounts() {
+    return {
+      'approved': _tasks.where((t) => t.status == 'approved').length,
+      'pending': _tasks.where((t) => t.status == 'pending').length,
+      'rejected': _tasks.where((t) => t.status == 'rejected').length,
+      'resubmitted': _tasks.where((t) => t.status == 'resubmitted').length,
+      'completed': _tasks.where((t) => t.status == 'completed').length,
+    };
+  }
+
+  // --- CREATE/UPDATE/DELETE OPERATIONS (Omitting for brevity, remain the same) ---
+
+  void createTask({
+    required String title,
+    required String description,
+    required String assignee,
+    required DateTime dueDate,
+    String? creator,
+  }) {
+    final newTask = Task(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      description: description,
+      status: 'pending',
+      assignee: assignee,
+      dueDate: dueDate,
+      creator: creator,
+    );
+    _tasks.add(newTask);
+    notifyListeners();
+  }
+
+  void _updateTaskStatus(
+    String taskId,
+    String newStatus, {
+    String? rejectionReason,
+  }) {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index != -1) {
+      final oldTask = _tasks[index];
+      _tasks[index] = Task(
+        id: oldTask.id,
+        title: oldTask.title,
+        description: oldTask.description,
+        status: newStatus,
+        assignee: oldTask.assignee,
+        dueDate: oldTask.dueDate,
+        creator: oldTask.creator,
+        rejectionReason: rejectionReason,
+      );
+      notifyListeners();
+    }
+  }
+
+  void approveTask(String taskId) => _updateTaskStatus(taskId, 'approved');
+  void rejectTask(String taskId, String reason) =>
+      _updateTaskStatus(taskId, 'rejected', rejectionReason: reason);
+  void markTaskComplete(String taskId) =>
+      _updateTaskStatus(taskId, 'completed');
+  void deleteTask(String taskId) {
+    _tasks.removeWhere((t) => t.id == taskId);
+    notifyListeners();
+  }
+
+  // --- LEADERBOARD RESET (Admin Only) ---
+  void resetLeaderboard() {
+    // Mark all completed/approved tasks as pending
+    for (int i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].status == 'completed' || _tasks[i].status == 'approved') {
+        final task = _tasks[i];
+        _tasks[i] = Task(
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: 'pending',
+          assignee: task.assignee,
+          dueDate: task.dueDate,
+          creator: task.creator,
+        );
+      }
+    }
+    notifyListeners();
+  }
+}
