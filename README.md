@@ -1,6 +1,6 @@
 # keitask_management
 
-A new Flutter project.
+Keitask a studnet progress tracker is at alpha stage!
 
 ## Getting Started
 
