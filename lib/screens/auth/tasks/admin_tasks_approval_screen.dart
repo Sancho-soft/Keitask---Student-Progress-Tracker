@@ -150,9 +150,15 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
 
                 final allTasks = snapshot.data ?? [];
 
-                // Apply filter
+                // Apply filter: pending should include 'pending' and 'resubmitted'
                 final filteredTasks = _filterStatus == 'pending'
-                    ? allTasks.where((t) => t.status == 'pending').toList()
+                    ? allTasks
+                          .where(
+                            (t) =>
+                                t.status.toLowerCase() == 'pending' ||
+                                t.status.toLowerCase() == 'resubmitted',
+                          )
+                          .toList()
                     : allTasks;
 
                 if (filteredTasks.isEmpty) {
@@ -170,7 +176,12 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                   itemCount: filteredTasks.length,
                   itemBuilder: (context, index) {
                     final task = filteredTasks[index];
-                    final assigneeName = taskService.getUserName(task.assignee);
+                    final assigneeId = task.assignees.isNotEmpty
+                        ? task.assignees.first
+                        : '';
+                    final assigneeName = assigneeId.isNotEmpty
+                        ? taskService.getUserName(assigneeId)
+                        : '';
                     return _buildTaskReviewCard(
                       context,
                       task,
@@ -207,12 +218,13 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
     FirestoreTaskService firestoreTaskService,
     String assigneeName,
   ) {
-    // Determine the status color and chips
-    final isPending = task.status == 'pending';
-    final isRejected = task.status == 'rejected';
+    // Determine the status color and chips (case-insensitive)
+    final statusLc = task.status.toLowerCase();
+    final isPending = statusLc == 'pending' || statusLc == 'resubmitted';
+    final isRejected = statusLc == 'rejected';
     final Color statusColor = isPending
         ? Colors.orange
-        : (task.status == 'approved' ? Colors.green : Colors.red);
+        : (statusLc == 'approved' ? Colors.green : Colors.red);
     final String statusText = task.status.toUpperCase();
 
     return Card(
@@ -316,6 +328,16 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                         height: 28,
                         child: ElevatedButton(
                           onPressed: () async {
+                            // Guard: only allow approve when task is pending or resubmitted
+                            final current = task.status.toLowerCase();
+                            if (current != 'pending' &&
+                                current != 'resubmitted') {
+                              _showFeedback(
+                                context,
+                                'Cannot approve task in its current state.',
+                              );
+                              return;
+                            }
                             await firestoreTaskService.approveTask(task.id);
                             if (!context.mounted) return;
                             _showFeedback(context, 'Task Approved.');

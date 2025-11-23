@@ -52,11 +52,12 @@ class LeaderboardScreen extends StatelessWidget {
             };
 
             for (final t in tasks) {
-              final assignee = t.assignee;
-              if (!counts.containsKey(assignee)) continue;
-              if (t.status == 'completed' || t.status == 'approved') {
+              // Count completed tasks per assignee (support multi-assignees)
+              if (t.status.toLowerCase() != 'completed') continue;
+              final cand = t.completedAt ?? t.dueDate;
+              for (final assignee in t.assignees) {
+                if (!counts.containsKey(assignee)) continue;
                 counts[assignee] = (counts[assignee] ?? 0) + 1;
-                final cand = t.completedAt ?? t.dueDate;
                 final prev = lastAt[assignee];
                 if (prev == null || cand.isAfter(prev)) {
                   lastAt[assignee] = cand;

@@ -85,18 +85,32 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       _selectedTime.minute,
     );
 
-    for (final assigneeId in _selectedAssigneeIds) {
-      final newTask = app_models.Task(
-        id: DateTime.now().millisecondsSinceEpoch.toString() + assigneeId,
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        status: 'pending',
-        assignee: assigneeId,
-        dueDate: dueDateTime,
-        creator: creatorId,
-      );
-      await taskService.createTask(newTask);
+    // Create a single Task that contains the list of selected assignees
+    final assignees = List<String>.from(_selectedAssigneeIds);
+    // Try to resolve human-readable assignee names (optional)
+    final authService = Provider.of<AuthService>(context, listen: false);
+    List<String>? assigneeNames;
+    try {
+      final allUsers = await authService.getAllUsers();
+      assigneeNames = allUsers
+          .where((u) => assignees.contains(u.id))
+          .map((u) => u.name)
+          .toList();
+    } catch (_) {
+      assigneeNames = null;
     }
+
+    final newTask = app_models.Task(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
+      status: 'pending',
+      assignees: assignees,
+      assigneeNames: assigneeNames,
+      dueDate: dueDateTime,
+      creator: creatorId,
+    );
+    await taskService.createTask(newTask);
 
     if (!mounted) return;
 

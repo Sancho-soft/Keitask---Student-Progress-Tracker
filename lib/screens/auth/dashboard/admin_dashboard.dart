@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../models/user_model.dart';
 import '../../../services/task_service.dart';
 import '../../../services/firestore_task_service.dart';
+import '../../../services/auth_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   final User user;
@@ -86,20 +87,37 @@ class _AdminDashboardState extends State<AdminDashboard> {
     // Use Provider to get the service instance
     final taskService = Provider.of<TaskService>(context);
     final firestoreTaskService = Provider.of<FirestoreTaskService>(context);
+    final auth = Provider.of<AuthService>(context, listen: false);
 
-    final taskCounts = taskService.getTaskCounts();
-    final approvedCount = taskCounts['approved'] ?? 0;
-    final pendingCount = taskCounts['pending'] ?? 0;
-    final rejectedCount = taskCounts['rejected'] ?? 0;
-    final resubmittedCount = taskCounts['resubmitted'] ?? 0;
-
-    // Fetch ALL tasks from Firebase where status is 'pending'
+    // Stream tasks and derive counts from Firestore to ensure accuracy
     return StreamBuilder<List<Task>>(
       stream: firestoreTaskService.tasksStream(),
       builder: (context, snapshot) {
         final allTasks = snapshot.data ?? [];
+
+        final approvedCount = allTasks
+            .where((t) => t.status.toLowerCase() == 'approved')
+            .length;
+        final pendingCount = allTasks
+            .where((t) => t.status.toLowerCase() == 'pending')
+            .length;
+        final rejectedCount = allTasks
+            .where((t) => t.status.toLowerCase() == 'rejected')
+            .length;
+        final resubmittedCount = allTasks
+            .where(
+              (t) =>
+                  t.status.toLowerCase() == 'resubmitted' ||
+                  t.status.toLowerCase() == 'resubmit',
+            )
+            .length;
+
         final pendingTasksReviews = allTasks
-            .where((task) => task.status == 'pending')
+            .where(
+              (task) =>
+                  task.status.toLowerCase() == 'pending' ||
+                  task.status.toLowerCase() == 'resubmitted',
+            )
             .toList();
 
         return SafeArea(
@@ -122,7 +140,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Hi, ${widget.user.name}!',
+                              'Hi, ${auth.appUser?.name ?? widget.user.name}!',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -143,16 +161,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       CircleAvatar(
                         radius: 28,
                         backgroundColor: Colors.white,
-                        child: Text(
-                          widget.user.name.isNotEmpty
-                              ? widget.user.name[0].toUpperCase()
-                              : 'A',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                        ),
+                        backgroundImage:
+                            (auth.appUser?.profileImage != null &&
+                                auth.appUser!.profileImage!.isNotEmpty)
+                            ? NetworkImage(auth.appUser!.profileImage!)
+                                  as ImageProvider
+                            : null,
+                        child:
+                            (auth.appUser == null ||
+                                auth.appUser!.profileImage == null ||
+                                auth.appUser!.profileImage!.isEmpty)
+                            ? Text(
+                                widget.user.name.isNotEmpty
+                                    ? widget.user.name[0].toUpperCase()
+                                    : 'A',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              )
+                            : null,
                       ),
                     ],
                   ),
@@ -282,9 +311,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               itemCount: pendingTasksReviews.length,
                               itemBuilder: (context, index) {
                                 final task = pendingTasksReviews[index];
-                                final assigneeName = taskService.getUserName(
-                                  task.assignee,
-                                );
+                                final assigneeId = task.assignees.isNotEmpty
+                                    ? task.assignees.first
+                                    : '';
+                                final assigneeName = assigneeId.isNotEmpty
+                                    ? taskService.getUserName(assigneeId)
+                                    : '';
 
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),

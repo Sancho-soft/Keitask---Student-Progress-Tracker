@@ -26,7 +26,9 @@ class TaskService extends ChangeNotifier {
 
   List<Task> getTasksByAssignee(String userId) {
     return _tasks
-        .where((task) => task.assignee == userId || task.creator == userId)
+        .where(
+          (task) => task.assignees.contains(userId) || task.creator == userId,
+        )
         .toList();
   }
 
@@ -54,16 +56,20 @@ class TaskService extends ChangeNotifier {
   void createTask({
     required String title,
     required String description,
-    required String assignee,
+    String? assignee,
+    List<String>? assignees,
     required DateTime dueDate,
     String? creator,
   }) {
+    final resolvedAssignees =
+        assignees ?? (assignee != null ? [assignee] : <String>[]);
+
     final newTask = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       description: description,
       status: 'pending',
-      assignee: assignee,
+      assignees: resolvedAssignees,
       dueDate: dueDate,
       creator: creator,
     );
@@ -84,7 +90,7 @@ class TaskService extends ChangeNotifier {
         title: oldTask.title,
         description: oldTask.description,
         status: newStatus,
-        assignee: oldTask.assignee,
+        assignees: oldTask.assignees,
         dueDate: oldTask.dueDate,
         creator: oldTask.creator,
         rejectionReason: rejectionReason,
@@ -114,7 +120,7 @@ class TaskService extends ChangeNotifier {
           title: task.title,
           description: task.description,
           status: 'pending',
-          assignee: task.assignee,
+          assignees: task.assignees,
           dueDate: task.dueDate,
           creator: task.creator,
         );

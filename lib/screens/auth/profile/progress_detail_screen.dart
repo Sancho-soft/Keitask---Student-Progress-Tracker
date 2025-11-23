@@ -28,10 +28,12 @@ class ProgressDetailScreen extends StatelessWidget {
             }
             final tasks = snap.data ?? [];
 
-            // Filter tasks assigned to current user
+            // Filter tasks assigned to current user (support multi-assignees)
             final myTasks = currentUserId == null
                 ? <Task>[]
-                : tasks.where((t) => t.assignee == currentUserId).toList();
+                : tasks
+                      .where((t) => t.assignees.contains(currentUserId))
+                      .toList();
 
             int approved = 0, pending = 0, rejected = 0, resubmitted = 0;
             int completedCount = 0;
@@ -47,8 +49,7 @@ class ProgressDetailScreen extends StatelessWidget {
               } else if (s == 'resubmitted' || s == 'resubmit') {
                 resubmitted++;
               }
-
-              if (s == 'completed' || s == 'approved') completedCount++;
+              if (s == 'completed') completedCount++;
             }
 
             final total = myTasks.length;

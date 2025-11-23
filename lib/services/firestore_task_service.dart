@@ -18,16 +18,22 @@ class FirestoreTaskService extends ChangeNotifier {
     return _tasksRef.snapshots().map(
       (snap) => snap.docs.map((d) {
         final data = d.data() as Map<String, dynamic>;
-        return app_models.Task.fromJson(data);
+        // ensure the document id is available to the model
+        final merged = Map<String, dynamic>.from(data);
+        merged['id'] = d.id;
+        return app_models.Task.fromJson(merged);
       }).toList(),
     );
   }
 
   Future<List<app_models.Task>> getAllTasks() async {
     final snap = await _tasksRef.get();
-    return snap.docs
-        .map((d) => app_models.Task.fromJson(d.data() as Map<String, dynamic>))
-        .toList();
+    return snap.docs.map((d) {
+      final data = d.data() as Map<String, dynamic>;
+      final merged = Map<String, dynamic>.from(data);
+      merged['id'] = d.id;
+      return app_models.Task.fromJson(merged);
+    }).toList();
   }
 
   Future<void> createTask(app_models.Task task) async {
@@ -49,10 +55,24 @@ class FirestoreTaskService extends ChangeNotifier {
   }
 
   Future<void> approveTask(String taskId) async {
+    // Approve without marking completedAt — approval is distinct from completion.
     await _tasksRef.doc(taskId).update({
       'status': 'approved',
       'rejectionReason': null,
     });
+    notifyListeners();
+  }
+
+  Future<void> toggleBookmark(String taskId, String userId, bool add) async {
+    if (add) {
+      await _tasksRef.doc(taskId).update({
+        'bookmarkedBy': FieldValue.arrayUnion([userId]),
+      });
+    } else {
+      await _tasksRef.doc(taskId).update({
+        'bookmarkedBy': FieldValue.arrayRemove([userId]),
+      });
+    }
     notifyListeners();
   }
 

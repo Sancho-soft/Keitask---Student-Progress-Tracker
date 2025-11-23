@@ -23,6 +23,8 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final auth = Provider.of<AuthService>(context);
+    final displayUser = auth.appUser ?? user;
 
     return Scaffold(
       appBar: AppBar(
@@ -55,10 +57,13 @@ class ProfileScreen extends StatelessWidget {
                   // Profile Avatar Circle with User Initial or Image
                   Stack(
                     children: [
-                      user.profileImage != null && user.profileImage!.isNotEmpty
+                      displayUser.profileImage != null &&
+                              displayUser.profileImage!.isNotEmpty
                           ? CircleAvatar(
                               radius: 60,
-                              backgroundImage: NetworkImage(user.profileImage!),
+                              backgroundImage: NetworkImage(
+                                displayUser.profileImage!,
+                              ),
                               backgroundColor:
                                   theme.colorScheme.primaryContainer,
                             )
@@ -67,8 +72,8 @@ class ProfileScreen extends StatelessWidget {
                               backgroundColor:
                                   theme.colorScheme.primaryContainer,
                               child: Text(
-                                user.name.isNotEmpty
-                                    ? user.name[0].toUpperCase()
+                                displayUser.name.isNotEmpty
+                                    ? displayUser.name[0].toUpperCase()
                                     : 'U',
                                 style: TextStyle(
                                   fontSize: 36,
@@ -140,11 +145,11 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoRow('Name', user.name),
+                  _buildInfoRow('Name', displayUser.name),
                   const SizedBox(height: 14),
-                  _buildInfoRow('Email', user.email),
+                  _buildInfoRow('Email', displayUser.email),
                   const SizedBox(height: 14),
-                  _buildInfoRow('Role', user.role),
+                  _buildInfoRow('Role', displayUser.role),
                   const SizedBox(height: 14),
                   _buildInfoRow(
                     'Joined',

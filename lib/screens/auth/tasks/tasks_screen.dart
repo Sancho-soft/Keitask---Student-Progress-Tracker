@@ -36,6 +36,7 @@ class _TasksScreenState extends State<TasksScreen> {
           context,
           listen: false,
         );
+        final statusLower = task.status.toLowerCase();
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,43 +52,176 @@ class _TasksScreenState extends State<TasksScreen> {
               ),
             ),
             const Divider(height: 1),
-            ListTile(
-              leading: const Icon(
-                Icons.check_circle_outline,
-                color: Colors.green,
-              ),
-              title: const Text('Finish Task'),
-              onTap: () async {
-                // Prevent marking already completed/approved tasks
-                final nav = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                if (task.status == 'completed' || task.status == 'approved') {
-                  nav.pop();
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Task is already completed.')),
+            Builder(
+              builder: (context) {
+                // If the task is rejected, show a Rejection reason action instead
+                if (statusLower == 'rejected') {
+                  return ListTile(
+                    leading: const Icon(
+                      Icons.report_problem,
+                      color: Colors.orange,
+                    ),
+                    title: const Text('View Rejection Reason'),
+                    onTap: () {
+                      Navigator.pop(context); // close sheet
+                      showDialog<void>(
+                        context: context,
+                        builder: (ctx) {
+                          return AlertDialog(
+                            title: const Text('Rejection Reason'),
+                            content: Text(
+                              task.rejectionReason ?? 'No reason provided.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.of(ctx).pop();
+                                  // Capture messenger using the dialog context to avoid
+                                  // using the outer BuildContext across async gaps.
+                                  final messenger = ScaffoldMessenger.of(ctx);
+                                  // confirm resubmit - use the dialog context `ctx`
+                                  final confirm = await showDialog<bool>(
+                                    context: ctx,
+                                    builder: (c) => AlertDialog(
+                                      title: const Text('Resubmit Task'),
+                                      content: const Text(
+                                        'Do you want to resubmit this task for review?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(c).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(c).pop(true),
+                                          child: const Text('Resubmit'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    try {
+                                      await firestore.resubmitTask(task.id);
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Task resubmitted.'),
+                                        ),
+                                      );
+                                    } catch (_) {
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Failed to resubmit task.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                child: const Text('Resubmit'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
                   );
-                  return;
                 }
-                await firestore.markTaskComplete(task.id);
-                nav.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Task marked as COMPLETED.')),
+
+                // Otherwise show Finish Task only for allowed statuses
+                if (statusLower == 'completed' ||
+                    statusLower == 'approved' ||
+                    statusLower == 'rejected') {
+                  return ListTile(
+                    leading: const Icon(
+                      Icons.check_circle_outline,
+                      color: Colors.grey,
+                    ),
+                    title: const Text('Finish Task'),
+                    enabled: false,
+                    onTap: null,
+                  );
+                }
+
+                return ListTile(
+                  leading: const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green,
+                  ),
+                  title: const Text('Finish Task'),
+                  onTap: () async {
+                    // Prevent marking already completed/approved tasks (case-insensitive)
+                    final nav = Navigator.of(context);
+                    final messenger = ScaffoldMessenger.of(context);
+                    final status = task.status.toLowerCase();
+                    if (status == 'completed' ||
+                        status == 'approved' ||
+                        status == 'rejected') {
+                      nav.pop();
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Task is already completed.'),
+                        ),
+                      );
+                      return;
+                    }
+                    // Double-check latest status from Firestore before updating
+                    try {
+                      final latestTasks = await firestore.getAllTasks();
+                      final latest = latestTasks.firstWhere(
+                        (t) => t.id == task.id,
+                        orElse: () => task,
+                      );
+                      final latestStatus = latest.status.toLowerCase();
+                      if (latestStatus == 'completed' ||
+                          latestStatus == 'approved' ||
+                          latestStatus == 'rejected') {
+                        nav.pop();
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Task is already completed.'),
+                          ),
+                        );
+                        return;
+                      }
+                    } catch (_) {
+                      // If fetch fails, proceed optimistically
+                    }
+                    await firestore.markTaskComplete(task.id);
+                    nav.pop();
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Task marked as COMPLETED.'),
+                      ),
+                    );
+                  },
                 );
               },
             ),
             ListTile(
               leading: const Icon(Icons.edit, color: Colors.blue),
               title: const Text('Edit Task'),
-              onTap: () {
-                Navigator.pop(context); // Close sheet
-                // Navigate to the dedicated Edit Task form
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditTaskScreen(task: task),
-                  ),
-                );
-              },
+              // Disable editing for approved/completed tasks
+              enabled:
+                  !(statusLower == 'approved' || statusLower == 'completed'),
+              onTap: (statusLower == 'approved' || statusLower == 'completed')
+                  ? null
+                  : () {
+                      Navigator.pop(context); // Close sheet
+                      // Navigate to the dedicated Edit Task form
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EditTaskScreen(task: task),
+                        ),
+                      );
+                    },
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
@@ -286,10 +420,10 @@ class _TasksScreenState extends State<TasksScreen> {
                   );
                 }
 
-                // Filter tasks by assignee/creator and selected date (or all if toggled)
+                // Filter tasks by assignee(s)/creator and selected date (or all if toggled)
                 final userTasks = allTasks.where((task) {
                   final matchesUser =
-                      task.assignee == effectiveUser.id ||
+                      task.assignees.contains(effectiveUser.id) ||
                       task.creator == effectiveUser.id;
 
                   // If showing all tasks, only filter by user
@@ -335,6 +469,7 @@ class _TasksScreenState extends State<TasksScreen> {
                       context,
                       task,
                       Provider.of<TaskService>(context),
+                      effectiveUser,
                     );
                   },
                 );
@@ -384,12 +519,16 @@ class _TasksScreenState extends State<TasksScreen> {
     BuildContext context,
     Task task,
     TaskService taskService,
+    User? effectiveUser,
   ) {
     // Determine the color/icon based on status
-    final bool isCompleted =
-        task.status == 'completed' || task.status == 'approved';
-    final Color iconColor = isCompleted ? Colors.green : Colors.blue;
-    final IconData statusIcon = isCompleted
+    // 'approved' is distinct from 'completed' — completed means finished by assignee
+    final bool isCompleted = task.status.toLowerCase() == 'completed';
+    final bool isApproved = task.status.toLowerCase() == 'approved';
+    final Color iconColor = isCompleted || isApproved
+        ? Colors.green
+        : Colors.blue;
+    final IconData statusIcon = (isCompleted || isApproved)
         ? Icons.check_circle_outline
         : Icons.circle;
 
@@ -400,10 +539,8 @@ class _TasksScreenState extends State<TasksScreen> {
 
     // Generate status text based on task state and due date
     String getTaskStatus() {
-      if (isCompleted) {
-        if (task.status == 'approved') return 'Approved';
-        return 'Completed';
-      }
+      if (isCompleted) return 'Completed';
+      if (isApproved) return 'Approved';
       if (task.status == 'rejected') return 'Rejected';
       if (task.status == 'pending') return 'Pending Review';
       if (isOverdue) return 'Overdue';
@@ -415,9 +552,17 @@ class _TasksScreenState extends State<TasksScreen> {
     final statusText = getTaskStatus();
     final statusColor = isCompleted
         ? Colors.green
-        : (isOverdue
-              ? Colors.red
-              : (task.status == 'rejected' ? Colors.orange : Colors.blue));
+        : (isApproved
+              ? Colors.green
+              : (isOverdue
+                    ? Colors.red
+                    : (task.status == 'rejected'
+                          ? Colors.orange
+                          : Colors.blue)));
+
+    final isBookmarked =
+        effectiveUser != null &&
+        (task.bookmarkedBy?.contains(effectiveUser.id) ?? false);
 
     return GestureDetector(
       onTap: () => _showTaskActionsSheet(context, task, taskService),
@@ -453,11 +598,47 @@ class _TasksScreenState extends State<TasksScreen> {
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
+                      // strike-through only for completed tasks
                       decoration: isCompleted
                           ? TextDecoration.lineThrough
                           : null,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  // Assignee avatars (show up to 3)
+                  if (task.assignees.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
+                      child: Row(
+                        children: List.generate(
+                          task.assignees.length > 3 ? 3 : task.assignees.length,
+                          (i) {
+                            final id = task.assignees[i];
+                            final name =
+                                (task.assigneeNames != null &&
+                                    task.assigneeNames!.length > i)
+                                ? task.assigneeNames![i]
+                                : id;
+                            return Container(
+                              margin: const EdgeInsets.only(right: 6),
+                              width: 28,
+                              height: 28,
+                              child: CircleAvatar(
+                                radius: 14,
+                                backgroundColor: Colors.blue[100],
+                                child: Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -493,7 +674,39 @@ class _TasksScreenState extends State<TasksScreen> {
               ),
             ),
             // Actions Icon (Right)
-            Icon(Icons.bookmark_border, color: Colors.grey[400]),
+            Column(
+              children: [
+                IconButton(
+                  icon: Icon(
+                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                    color: isBookmarked ? Colors.blue : Colors.grey[400],
+                  ),
+                  onPressed: effectiveUser == null
+                      ? null
+                      : () async {
+                          final firestore = Provider.of<FirestoreTaskService>(
+                            context,
+                            listen: false,
+                          );
+                          final messenger = ScaffoldMessenger.of(context);
+                          try {
+                            await firestore.toggleBookmark(
+                              task.id,
+                              effectiveUser.id,
+                              !isBookmarked,
+                            );
+                          } catch (_) {
+                            if (!mounted) return;
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Failed to update bookmark'),
+                              ),
+                            );
+                          }
+                        },
+                ),
+              ],
+            ),
           ],
         ),
       ),

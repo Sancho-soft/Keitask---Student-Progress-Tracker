@@ -33,11 +33,11 @@ class _UserDashboardState extends State<UserDashboard> {
         final allTasks = snap.data ?? <Task>[];
         final currentUserId = auth.appUser?.id ?? widget.user.id;
 
-        // Filter tasks assigned or created by current user
+        // Filter tasks assigned (supporting multi-assignees) or created by current user
         final userTasks = allTasks
             .where(
               (task) =>
-                  task.assignee == currentUserId ||
+                  task.assignees.contains(currentUserId) ||
                   task.creator == currentUserId,
             )
             .toList();
@@ -62,12 +62,9 @@ class _UserDashboardState extends State<UserDashboard> {
                   t.status.toLowerCase() == 'resubmit',
             )
             .length;
+        // Completed should reflect only fully completed tasks (not just approved)
         final completedCount = userTasks
-            .where(
-              (t) =>
-                  t.status.toLowerCase() == 'completed' ||
-                  t.status.toLowerCase() == 'approved',
-            )
+            .where((t) => t.status.toLowerCase() == 'completed')
             .length;
         final totalTasks = userTasks.length;
         final completionPercentage = totalTasks > 0
@@ -196,7 +193,9 @@ class _UserDashboardState extends State<UserDashboard> {
                         onTap: () {
                           // Show rejection reasons for user's rejected tasks
                           final rejectedTasks = userTasks
-                              .where((t) => t.status == 'rejected')
+                              .where(
+                                (t) => t.status.toLowerCase() == 'rejected',
+                              )
                               .toList();
                           if (rejectedTasks.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
