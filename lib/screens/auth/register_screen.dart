@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../services/auth_service.dart';
@@ -22,6 +23,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _birthdayController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
+  String _selectedRole = 'student'; // Default role
 
   // Step 2: Email
   final _emailController = TextEditingController();
@@ -108,22 +110,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+        role: _selectedRole,
         profileImageFile: _profileImageFile,
       );
       if (!mounted) return;
       if (user != null) {
-        // Show account created animation
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => RegistrationSuccessDialog(
-            onComplete: () {
-              // Navigate back to login after animation completes
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.pop(context); // Go back to Login Screen
-            },
-          ),
-        );
+        if (_selectedRole == 'professor') {
+          // Professor flow: Show pending approval dialog then sign out
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Registration Successful'),
+              content: const Text(
+                'Your account has been created but requires Admin approval before you can log in.\n\nPlease wait for an administrator to approve your account.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    Navigator.pop(context); // Close dialog
+                    await auth.signOut(); // Sign out immediately
+                    if (!mounted) return;
+                    Navigator.pop(context); // Go back to Login Screen
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // Student flow: Show success animation and login
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => RegistrationSuccessDialog(
+              onComplete: () {
+                // Navigate back to login after animation completes
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.pop(context); // Go back to Login Screen
+              },
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -139,6 +167,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
           content: Text('Registration error: $e'),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final user = await auth.signInWithGoogle();
+      if (!mounted) return;
+      if (user != null) {
+        Navigator.of(
+          context,
+        ).pushReplacementNamed('/dashboard', arguments: user);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google sign-in failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google sign-in error: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     } finally {
@@ -288,6 +347,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     hint: 'Enter your phone number',
                     keyboardType: TextInputType.phone,
                   ),
+                  const SizedBox(height: 24),
+
+                  // Role Selection
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'I am a:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedRole,
+                            isExpanded: true,
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'student',
+                                child: Text('Student'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'professor',
+                                child: Text('Professor'),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _selectedRole = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ]
                 // Step 2: Email
                 else if (_currentStep == 1) ...[
@@ -335,8 +439,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const Expanded(
                         child: Text(
                           'I agree to the Terms and Conditions',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: Colors.black87),
                         ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Terms and Conditions'),
+                              content: const SingleChildScrollView(
+                                child: Text(
+                                  'Here are the terms and conditions...\n\n1. Use the app responsibly.\n2. Do not share your password.\n3. Respect other users.\n\n(This is a placeholder for actual terms)',
+                                ),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Close'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        child: const Text('Read'),
                       ),
                     ],
                   ),
@@ -472,25 +598,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     width: double.infinity,
                     height: 56,
                     child: OutlinedButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Google Sign-In requires additional setup',
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: _isLoading ? null : _signInWithGoogle,
                       style: OutlinedButton.styleFrom(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         side: const BorderSide(color: Colors.grey),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.g_mobiledata, color: Colors.grey),
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: SvgPicture.asset(
+                              'assets/images/icons8-google.svg',
+                              width: 24,
+                              height: 24,
+                            ),
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Continue with Google',
@@ -538,7 +664,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Colors.grey,
+            color: Colors.black87, // Fixed faded label
           ),
         ),
         const SizedBox(height: 8),
@@ -568,7 +694,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Colors.grey,
+            color: Colors.black87, // Fixed faded label
           ),
         ),
         const SizedBox(height: 8),
@@ -617,7 +743,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Colors.grey,
+            color: Colors.black87, // Fixed faded label
           ),
         ),
         const SizedBox(height: 8),

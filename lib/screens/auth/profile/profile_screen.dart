@@ -5,7 +5,8 @@ import '../../../models/user_model.dart';
 import 'package:provider/provider.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/theme_service.dart';
-import 'progress_detail_screen.dart';
+import '../../../services/firestore_task_service.dart';
+// import 'progress_detail_screen.dart'; // Removed as not used in this screen
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -25,6 +26,8 @@ class ProfileScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final auth = Provider.of<AuthService>(context);
     final displayUser = auth.appUser ?? user;
+
+    // Firestore is accessed directly in dialogs using Provider to avoid scope issues.
 
     return Scaffold(
       appBar: AppBar(
@@ -113,6 +116,7 @@ class ProfileScreen extends StatelessWidget {
                       color: Colors.white.withAlpha(200),
                       borderRadius: BorderRadius.circular(16),
                     ),
+
                     child: Text(
                       user.role.toUpperCase(),
                       style: TextStyle(
@@ -121,6 +125,135 @@ class ProfileScreen extends StatelessWidget {
                         color: theme.colorScheme.primary,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Rank Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withAlpha(200),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      displayUser.rank.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.brown.shade800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Points & Completed summary (realtime)
+                  StreamBuilder<List<Task>>(
+                    stream: Provider.of<FirestoreTaskService>(
+                      context,
+                      listen: false,
+                    ).tasksStream(),
+                    builder: (context, snapshot) {
+                      final tasks = snapshot.data ?? [];
+                      final authInner = Provider.of<AuthService>(context);
+                      final effectiveUser = authInner.appUser ?? user;
+                      final completedCount = tasks
+                          .where(
+                            (t) =>
+                                t.assignees.contains(effectiveUser.id) &&
+                                t.status.toLowerCase() == 'completed',
+                          )
+                          .length;
+                      final points = effectiveUser.points;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(230),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.emoji_events,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$points pts',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'Points',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(230),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(width: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$completedCount',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'Completed',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -148,6 +281,8 @@ class ProfileScreen extends StatelessWidget {
                   _buildInfoRow('Name', displayUser.name),
                   const SizedBox(height: 14),
                   _buildInfoRow('Email', displayUser.email),
+                  const SizedBox(height: 14),
+                  _buildInfoRow('Phone', displayUser.phoneNumber ?? 'Not set'),
                   const SizedBox(height: 14),
                   _buildInfoRow('Role', displayUser.role),
                   const SizedBox(height: 14),
@@ -219,6 +354,13 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () => _showSystemPreferencesDialog(context),
                   ),
                   const SizedBox(height: 12),
+                  // Rewards button
+                  _buildSettingButton(
+                    icon: Icons.card_giftcard,
+                    label: 'Rewards',
+                    onTap: () => _showRewardsDialog(context, displayUser),
+                  ),
+                  const SizedBox(height: 12),
                   // Logout
                   _buildSettingButton(
                     icon: Icons.logout,
@@ -258,6 +400,7 @@ class ProfileScreen extends StatelessWidget {
   // Helper: Show feature coming soon
   void _showEditProfileDialog(BuildContext context) {
     final nameController = TextEditingController(text: user.name);
+    final phoneController = TextEditingController(text: user.phoneNumber);
     final emailController = TextEditingController(text: user.email);
     final roleController = TextEditingController(text: user.role.toUpperCase());
     bool isLoading = false;
@@ -372,6 +515,20 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  // Phone Number
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      label: const Text('Phone Number'),
+                      hintText: 'Enter your phone number',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixIcon: const Icon(Icons.phone, color: Colors.grey),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   // Role display (read-only)
                   TextField(
                     controller: roleController,
@@ -432,6 +589,11 @@ class ProfileScreen extends StatelessWidget {
 
                           // Update user name and optionally profile image
                           await auth.updateUserName(nameController.text.trim());
+                          // Update phone number
+                          await auth.updateUserPhone(
+                            phoneController.text.trim(),
+                          );
+
                           if (imageUrl != null) {
                             await auth.updateUserProfileImage(imageUrl);
                           }
@@ -439,12 +601,7 @@ class ProfileScreen extends StatelessWidget {
                           if (!context.mounted) return;
                           Navigator.pop(context);
                           // Navigate to Progress Detail page after save
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ProgressDetailScreen(),
-                            ),
-                          );
+                          // Keep user on profile page after saving changes. No navigation.
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Profile updated successfully!'),
@@ -486,6 +643,9 @@ class ProfileScreen extends StatelessWidget {
     bool isLoading = false;
     bool obscureNew = true;
     bool obscureConfirm = true;
+    final firestore = Provider.of<FirestoreTaskService>(context, listen: false);
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final dialogUser = auth.appUser ?? user;
 
     showDialog(
       context: context,
@@ -512,6 +672,109 @@ class ProfileScreen extends StatelessWidget {
                       onPressed: () => setState(() => obscureNew = !obscureNew),
                     ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                // Points and Completed Tasks summary
+                StreamBuilder<List<Task>>(
+                  stream: firestore.tasksStream(),
+                  builder: (context, snapshot) {
+                    final tasks = snapshot.data ?? [];
+                    final completedCount = tasks
+                        .where(
+                          (t) =>
+                              t.assignees.contains(dialogUser.id) &&
+                              t.status.toLowerCase() == 'completed',
+                        )
+                        .length;
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(230),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.emoji_events,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${dialogUser.points} pts',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Points',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(230),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '$completedCount',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Completed',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -764,6 +1027,129 @@ class ProfileScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showRewardsDialog(BuildContext context, User displayUser) {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    bool isRedeeming = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final currentUser =
+              Provider.of<AuthService>(context).appUser ?? displayUser;
+          final points = currentUser.points;
+          // Determine tier and progress
+          String tier;
+          // Determine tier threshold (unused variable removed)
+          if (points >= 500) {
+            tier = 'Gold';
+          } else if (points >= 200) {
+            tier = 'Silver';
+          } else if (points >= 50) {
+            tier = 'Bronze';
+          } else {
+            tier = 'Newbie';
+          }
+
+          return AlertDialog(
+            title: const Text('Rewards'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Points: $points'),
+                const SizedBox(height: 8),
+                Text('Tier: $tier'),
+                const SizedBox(height: 12),
+                const Text('Rewards available:'),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.stars, color: Colors.orange),
+                  title: const Text('Sticker Pack'),
+                  subtitle: const Text('Costs 50 pts'),
+                  trailing: ElevatedButton(
+                    onPressed: isRedeeming || points < 50
+                        ? null
+                        : () async {
+                            setState(() => isRedeeming = true);
+                            try {
+                              await auth.incrementUserPoints(
+                                currentUser.id,
+                                -50,
+                              );
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Sticker pack redeemed!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              // Refresh local displayUser through AuthService listener
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Redeem failed: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            } finally {
+                              setState(() => isRedeeming = false);
+                            }
+                          },
+                    child: const Text('Redeem'),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.card_giftcard, color: Colors.blue),
+                  title: const Text('Certificate'),
+                  subtitle: const Text('Costs 200 pts'),
+                  trailing: ElevatedButton(
+                    onPressed: isRedeeming || points < 200
+                        ? null
+                        : () async {
+                            setState(() => isRedeeming = true);
+                            try {
+                              await auth.incrementUserPoints(
+                                currentUser.id,
+                                -200,
+                              );
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Certificate redeemed!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Redeem failed: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            } finally {
+                              setState(() => isRedeeming = false);
+                            }
+                          },
+                    child: const Text('Redeem'),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

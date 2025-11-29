@@ -1,9 +1,8 @@
-// keitask_management/lib/screens/auth/login_screen.dart
-
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -59,6 +58,37 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      final user = await auth.signInWithGoogle();
+      if (!mounted) return;
+      if (user != null) {
+        Navigator.of(
+          context,
+        ).pushReplacementNamed('/dashboard', arguments: user);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google sign in failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Google sign-in error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -204,53 +234,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 // Forgot Password Link
                 Align(
-                  alignment: Alignment.centerLeft,
+                  alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () async {
-                      final email = _emailController.text.trim();
-                      final scaffoldMessenger = ScaffoldMessenger.of(context);
-                      final auth = Provider.of<AuthService>(
+                    onPressed: () {
+                      Navigator.push(
                         context,
-                        listen: false,
+                        MaterialPageRoute(
+                          builder: (context) => const ForgotPasswordScreen(),
+                        ),
                       );
-                      if (email.isEmpty) {
-                        scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Please enter your email to reset password.',
-                            ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-                      try {
-                        await auth.sendPasswordResetEmail(email);
-                        if (!mounted) return;
-                        scaffoldMessenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Password reset email sent!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        scaffoldMessenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
                     },
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
                     child: const Text(
                       'Forgot password?',
-                      style: TextStyle(color: Colors.blue, fontSize: 14),
+                      style: TextStyle(color: Colors.blue),
                     ),
                   ),
                 ),
@@ -279,15 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: 56,
                   child: OutlinedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Google Sign-In requires additional setup',
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: _isLoading ? null : _signInWithGoogle,
                     style: OutlinedButton.styleFrom(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -308,7 +296,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Text(
+                        const Text(
                           'Continue with Google',
                           style: TextStyle(
                             fontSize: 14,

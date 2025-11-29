@@ -1,16 +1,17 @@
-// keitask_management/lib/screens/auth/tasks/tasks_screen.dart (MODIFIED FOR USER UI)
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../models/user_model.dart';
 import '../../../services/task_service.dart';
 import '../../../services/firestore_task_service.dart';
-import 'edit_task_screen.dart'; // Import to use in the action sheet
+import '../../../services/auth_service.dart';
+import 'edit_task_screen.dart';
+import 'task_submission_screen.dart';
 
 class TasksScreen extends StatefulWidget {
   final User? user;
+  final bool showBackButton;
 
-  const TasksScreen({super.key, this.user});
+  const TasksScreen({super.key, this.user, this.showBackButton = true});
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -18,12 +19,90 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   DateTime _selectedDate = DateTime.now();
-  int _selectedDayIndex = DateTime.now().weekday % 7; // 0 = Sunday
-  bool _showAllTasks = false; // Toggle to show all tasks or just today
+  DateTime _currentDisplayedDate = DateTime.now(); // For the header
+  bool _showAllTasks = false;
+  late ScrollController _dateScrollController;
 
-  // Note: we'll filter streamed tasks in the StreamBuilder below.
+  // Cache for user objects to display avatars
+  final Map<String, User> _userCache = {};
 
-  // --- NEW: Task Action Context Menu (Modal Bottom Sheet) ---
+  @override
+  void initState() {
+    super.initState();
+    _dateScrollController = ScrollController(
+      initialScrollOffset:
+          (365 * 60.0) - // Adjusted item width estimate
+          (MediaQueryData.fromView(WidgetsBinding.instance.window).size.width /
+              2) +
+          30,
+    );
+    _dateScrollController.addListener(_onScroll);
+    _fetchUsers();
+
+    // Center on today after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_dateScrollController.hasClients) {
+        _scrollToDate(DateTime.now());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _dateScrollController.removeListener(_onScroll);
+    _dateScrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_dateScrollController.hasClients) return;
+    // Calculate center index
+    final double centerOffset =
+        _dateScrollController.offset + MediaQuery.of(context).size.width / 2;
+    final int index = (centerOffset / 60.0)
+        .floor(); // 60 = 50 width + 10 margin
+
+    // index 365 is today (start of list is today - 365)
+    // Actually, let's align with the builder logic:
+    // builder index 0 = today - 365 days.
+    // So index 365 = today.
+
+    final date = DateTime.now().add(Duration(days: index - 365));
+    if (date.month != _currentDisplayedDate.month ||
+        date.year != _currentDisplayedDate.year) {
+      setState(() {
+        _currentDisplayedDate = date;
+      });
+    }
+  }
+
+  void _scrollToDate(DateTime date) {
+    final diff = date.difference(DateTime.now()).inDays;
+    final index = 365 + diff;
+    final offset = (index * 60.0) - MediaQuery.of(context).size.width / 2 + 30;
+    _dateScrollController.animateTo(
+      offset,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  Future<void> _fetchUsers() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    try {
+      final users = await authService.getAllUsers();
+      if (mounted) {
+        setState(() {
+          for (var user in users) {
+            _userCache[user.id] = user;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error fetching users for avatars: $e');
+    }
+  }
+
   void _showTaskActionsSheet(
     BuildContext context,
     Task task,
@@ -31,212 +110,114 @@ class _TasksScreenState extends State<TasksScreen> {
   ) {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         final firestore = Provider.of<FirestoreTaskService>(
           context,
           listen: false,
         );
         final statusLower = task.status.toLowerCase();
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                task.title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  task.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            ),
-            const Divider(height: 1),
-            Builder(
-              builder: (context) {
-                // If the task is rejected, show a Rejection reason action instead
-                if (statusLower == 'rejected') {
-                  return ListTile(
-                    leading: const Icon(
-                      Icons.report_problem,
-                      color: Colors.orange,
-                    ),
-                    title: const Text('View Rejection Reason'),
-                    onTap: () {
-                      Navigator.pop(context); // close sheet
-                      showDialog<void>(
-                        context: context,
-                        builder: (ctx) {
-                          return AlertDialog(
-                            title: const Text('Rejection Reason'),
-                            content: Text(
-                              task.rejectionReason ?? 'No reason provided.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () async {
-                                  Navigator.of(ctx).pop();
-                                  // Capture messenger using the dialog context to avoid
-                                  // using the outer BuildContext across async gaps.
-                                  final messenger = ScaffoldMessenger.of(ctx);
-                                  // confirm resubmit - use the dialog context `ctx`
-                                  final confirm = await showDialog<bool>(
-                                    context: ctx,
-                                    builder: (c) => AlertDialog(
-                                      title: const Text('Resubmit Task'),
-                                      content: const Text(
-                                        'Do you want to resubmit this task for review?',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(c).pop(false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(c).pop(true),
-                                          child: const Text('Resubmit'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  if (confirm == true) {
-                                    try {
-                                      await firestore.resubmitTask(task.id);
-                                      messenger.showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Task resubmitted.'),
-                                        ),
-                                      );
-                                    } catch (_) {
-                                      messenger.showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Failed to resubmit task.',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                },
-                                child: const Text('Resubmit'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx).pop(),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  );
-                }
-
-                // Otherwise show Finish Task only for allowed statuses
-                if (statusLower == 'completed' ||
-                    statusLower == 'approved' ||
-                    statusLower == 'rejected') {
-                  return ListTile(
-                    leading: const Icon(
-                      Icons.check_circle_outline,
-                      color: Colors.grey,
-                    ),
-                    title: const Text('Finish Task'),
-                    enabled: false,
-                    onTap: null,
-                  );
-                }
-
-                return ListTile(
-                  leading: const Icon(
-                    Icons.check_circle_outline,
-                    color: Colors.green,
-                  ),
-                  title: const Text('Finish Task'),
-                  onTap: () async {
-                    // Prevent marking already completed/approved tasks (case-insensitive)
-                    final nav = Navigator.of(context);
-                    final messenger = ScaffoldMessenger.of(context);
-                    final status = task.status.toLowerCase();
-                    if (status == 'completed' ||
-                        status == 'approved' ||
-                        status == 'rejected') {
-                      nav.pop();
-                      messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text('Task is already completed.'),
-                        ),
-                      );
-                      return;
-                    }
-                    // Double-check latest status from Firestore before updating
-                    try {
-                      final latestTasks = await firestore.getAllTasks();
-                      final latest = latestTasks.firstWhere(
-                        (t) => t.id == task.id,
-                        orElse: () => task,
-                      );
-                      final latestStatus = latest.status.toLowerCase();
-                      if (latestStatus == 'completed' ||
-                          latestStatus == 'approved' ||
-                          latestStatus == 'rejected') {
-                        nav.pop();
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Task is already completed.'),
-                          ),
-                        );
-                        return;
-                      }
-                    } catch (_) {
-                      // If fetch fails, proceed optimistically
-                    }
-                    await firestore.markTaskComplete(task.id);
-                    nav.pop();
-                    messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text('Task marked as COMPLETED.'),
+              const Divider(height: 1),
+              Builder(
+                builder: (context) {
+                  if (statusLower == 'rejected') {
+                    return ListTile(
+                      leading: const Icon(
+                        Icons.report_problem,
+                        color: Colors.orange,
                       ),
+                      title: const Text('View Rejection Reason'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        showDialog<void>(
+                          context: context,
+                          builder: (ctx) {
+                            return AlertDialog(
+                              title: const Text('Rejection Reason'),
+                              content: Text(
+                                task.rejectionReason ?? 'No reason provided.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('Close'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                     );
-                  },
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.edit, color: Colors.blue),
-              title: const Text('Edit Task'),
-              // Disable editing for approved/completed tasks
-              enabled:
-                  !(statusLower == 'approved' || statusLower == 'completed'),
-              onTap: (statusLower == 'approved' || statusLower == 'completed')
-                  ? null
-                  : () {
-                      Navigator.pop(context); // Close sheet
-                      // Navigate to the dedicated Edit Task form
+                  }
+
+                  // Default action: Submit Task
+                  return ListTile(
+                    leading: const Icon(Icons.upload_file, color: Colors.blue),
+                    title: const Text('Submit Task'),
+                    onTap: () {
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => EditTaskScreen(task: task),
+                          builder: (context) => TaskSubmissionScreen(
+                            task: task,
+                            user: widget.user!,
+                          ),
                         ),
                       );
                     },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete Task'),
-              onTap: () async {
-                final nav = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                await firestore.deleteTask(task.id);
-                nav.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Task deleted.')),
-                );
-              },
-            ),
-          ],
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit, color: Colors.blue),
+                title: const Text('Edit Task'),
+                enabled:
+                    !(statusLower == 'approved' || statusLower == 'completed'),
+                onTap: (statusLower == 'approved' || statusLower == 'completed')
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditTaskScreen(task: task),
+                          ),
+                        );
+                      },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Delete Task'),
+                onTap: () async {
+                  final nav = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
+                  await firestore.deleteTask(task.id);
+                  nav.pop();
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Task deleted.')),
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -244,156 +225,204 @@ class _TasksScreenState extends State<TasksScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Keep TaskService available in widget tree for helper functions; we access it inline where needed.
     final args = ModalRoute.of(context)?.settings.arguments;
     final routeUser = (args is User) ? args : null;
     final effectiveUser = widget.user ?? routeUser;
-    final isAdmin = (effectiveUser is User) && effectiveUser.role == 'admin';
     final firestore = Provider.of<FirestoreTaskService>(context);
 
-    // Get current month/year for header
     final monthYear =
-        '${_getMonthName(_selectedDate.month)} ${_selectedDate.year}';
-    final daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        '${_getMonthName(_currentDisplayedDate.month)} ${_currentDisplayedDate.year}';
 
     return Scaffold(
+      backgroundColor: Colors.grey[50], // Light background for contrast
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+        leading: widget.showBackButton
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+        automaticallyImplyLeading: false,
+        title: Text(
+          monthYear,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
-        title: Text(monthYear),
-        actions: [IconButton(icon: const Icon(Icons.search), onPressed: () {})],
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_today, color: Colors.black87),
+            onPressed: () {
+              _scrollToDate(DateTime.now());
+              setState(() {
+                _selectedDate = DateTime.now();
+                _currentDisplayedDate = DateTime.now();
+              });
+            },
+          ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date Selector (Matching Figma Design)
+          // Date Selector (Infinite Scroll)
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: SingleChildScrollView(
+            height: 100, // Increased height to prevent overflow
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: ListView.builder(
+              controller: _dateScrollController,
               scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(7, (index) {
-                  final isSelected = index == _selectedDayIndex;
-                  final dayName = daysOfWeek[index];
-                  // Calculate the day number for this week
-                  final today = DateTime.now();
-                  final startOfWeek = today.subtract(
-                    Duration(days: today.weekday % 7),
-                  );
-                  final day = startOfWeek.add(Duration(days: index));
+              itemCount: 1000, // Range: Today - 365 to Today + 635
+              itemBuilder: (context, index) {
+                // index 365 is today
+                final dayOffset = index - 365;
+                final date = DateTime.now().add(Duration(days: dayOffset));
+                final isSelected =
+                    date.year == _selectedDate.year &&
+                    date.month == _selectedDate.month &&
+                    date.day == _selectedDate.day;
 
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedDayIndex = index;
-                        _selectedDate = DateTime(day.year, day.month, day.day);
-                      });
-                    },
-                    child: Container(
-                      width: 50,
-                      margin: EdgeInsets.only(
-                        left: index == 0 ? 16 : 4,
-                        right: 4,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue : Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: isSelected
-                            ? null
-                            : Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            dayName.toUpperCase().substring(0, 3),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isSelected ? Colors.white : Colors.grey,
-                              fontWeight: FontWeight.w500,
+                final isToday =
+                    date.year == DateTime.now().year &&
+                    date.month == DateTime.now().month &&
+                    date.day == DateTime.now().day;
+
+                final daysOfWeek = [
+                  'Mon',
+                  'Tue',
+                  'Wed',
+                  'Thu',
+                  'Fri',
+                  'Sat',
+                  'Sun',
+                ];
+                final dayName = daysOfWeek[date.weekday - 1];
+
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedDate = DateTime(date.year, date.month, date.day);
+                    });
+                    _scrollToDate(date);
+                  },
+                  child: Container(
+                    width: 50,
+                    margin: const EdgeInsets.symmetric(horizontal: 5),
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.blue : Colors.white,
+                      borderRadius: BorderRadius.circular(25), // Capsule shape
+                      border: isSelected
+                          ? null
+                          : Border.all(
+                              color: isToday
+                                  ? Colors.blue.withAlpha(100)
+                                  : Colors.grey.shade200,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isSelected ? Colors.white : Colors.black87,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: Colors.blue.withAlpha(100),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
                     ),
-                  );
-                }),
-              ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          dayName.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isSelected ? Colors.white70 : Colors.grey,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          width: 30,
+                          height: 30,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withAlpha(50)
+                                : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            '${date.day}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (isToday && !isSelected)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            width: 4,
+                            height: 4,
+                            decoration: const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
-          const Divider(height: 1),
 
           Padding(
-            padding: const EdgeInsets.only(
-              top: 16.0,
-              left: 16.0,
-              right: 16.0,
-              bottom: 8.0,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Task',
-                  style: TextStyle(
-                    fontSize: 16,
+                Text(
+                  'Tasks for ${_selectedDate.day == DateTime.now().day && _selectedDate.month == DateTime.now().month ? "Today" : _formatDateDay(_selectedDate)}',
+                  style: const TextStyle(
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
-                Row(
-                  children: [
-                    // Toggle button for all tasks
-                    GestureDetector(
-                      onTap: () =>
-                          setState(() => _showAllTasks = !_showAllTasks),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _showAllTasks ? Colors.blue : Colors.grey[200],
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _showAllTasks ? 'All' : 'Today',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _showAllTasks
-                                ? Colors.white
-                                : Colors.black87,
-                          ),
-                        ),
+                GestureDetector(
+                  onTap: () => setState(() => _showAllTasks = !_showAllTasks),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _showAllTasks ? Colors.blue : Colors.grey[200],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _showAllTasks ? 'Show All' : 'Show Daily',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _showAllTasks ? Colors.white : Colors.black87,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Notification Icon
-                    Icon(
-                      Icons.notifications_none,
-                      color: Colors.grey[600],
-                      size: 20,
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
 
-          // Task List (real-time from Firestore)
           Expanded(
             child: StreamBuilder<List<Task>>(
               stream: firestore.tasksStream(),
@@ -403,7 +432,6 @@ class _TasksScreenState extends State<TasksScreen> {
                 }
                 final allTasks = snapshot.data ?? [];
 
-                // If we don't have an effective user, show empty state
                 if (effectiveUser == null) {
                   return Center(
                     child: Column(
@@ -420,18 +448,15 @@ class _TasksScreenState extends State<TasksScreen> {
                   );
                 }
 
-                // Filter tasks by assignee(s)/creator and selected date (or all if toggled)
                 final userTasks = allTasks.where((task) {
                   final matchesUser =
                       task.assignees.contains(effectiveUser.id) ||
                       task.creator == effectiveUser.id;
 
-                  // If showing all tasks, only filter by user
                   if (_showAllTasks) {
                     return matchesUser;
                   }
 
-                  // Otherwise filter by both user and date
                   final matchesDate =
                       task.dueDate.year == _selectedDate.year &&
                       task.dueDate.month == _selectedDate.month &&
@@ -444,17 +469,38 @@ class _TasksScreenState extends State<TasksScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.task_alt, size: 64, color: Colors.grey[400]),
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withAlpha(10),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.event_available,
+                            size: 48,
+                            color: Colors.blue[300],
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           _showAllTasks
                               ? 'No tasks found'
-                              : 'No tasks found for ${_formatDateDay(_selectedDate)}',
+                              : 'No tasks for ${_formatDateDay(_selectedDate)}',
                           style: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (!_showAllTasks)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: TextButton(
+                              onPressed: () =>
+                                  setState(() => _showAllTasks = true),
+                              child: const Text('View all tasks'),
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -476,68 +522,30 @@ class _TasksScreenState extends State<TasksScreen> {
               },
             ),
           ),
-
-          // New Task Button (Matching Figma - Centered)
-          if (!isAdmin)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/create-task',
-                      arguments: effectiveUser,
-                    );
-                  },
-                  icon: const Icon(Icons.add, color: Colors.blue),
-                  label: const Text(
-                    'New task',
-                    style: TextStyle(color: Colors.blue),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    side: const BorderSide(color: Colors.blue),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 10,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
-      // NOTE: BottomNavigationBar is handled in dashboard_screen.dart
     );
   }
 
-  // --- Task Card Widget (Matching Figma Task Interface) ---
   Widget _buildTaskCard(
     BuildContext context,
     Task task,
     TaskService taskService,
     User? effectiveUser,
   ) {
-    // Determine the color/icon based on status
-    // 'approved' is distinct from 'completed' — completed means finished by assignee
     final bool isCompleted = task.status.toLowerCase() == 'completed';
     final bool isApproved = task.status.toLowerCase() == 'approved';
     final Color iconColor = isCompleted || isApproved
         ? Colors.green
         : Colors.blue;
     final IconData statusIcon = (isCompleted || isApproved)
-        ? Icons.check_circle_outline
-        : Icons.circle;
+        ? Icons.check_circle
+        : Icons.circle_outlined;
 
-    // Calculate if task is overdue
     final now = DateTime.now();
     final isOverdue = !isCompleted && task.dueDate.isBefore(now);
     final daysUntilDue = task.dueDate.difference(now).inDays;
 
-    // Generate status text based on task state and due date
     String getTaskStatus() {
       if (isCompleted) return 'Completed';
       if (isApproved) return 'Approved';
@@ -567,150 +575,246 @@ class _TasksScreenState extends State<TasksScreen> {
     return GestureDetector(
       onTap: () => _showTaskActionsSheet(context, task, taskService),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withAlpha((0.1 * 255).round()),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: Colors.black.withAlpha(10),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
           children: [
-            // Status Icon (Left)
-            Icon(statusIcon, color: iconColor, size: 24),
-            const SizedBox(width: 12),
-            // Task Details (Middle)
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                      // strike-through only for completed tasks
-                      decoration: isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconColor.withAlpha(30),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 6),
-                  // Assignee avatars (show up to 3)
-                  if (task.assignees.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6.0),
-                      child: Row(
-                        children: List.generate(
-                          task.assignees.length > 3 ? 3 : task.assignees.length,
-                          (i) {
-                            final id = task.assignees[i];
-                            final name =
-                                (task.assigneeNames != null &&
-                                    task.assigneeNames!.length > i)
-                                ? task.assigneeNames![i]
-                                : id;
-                            return Container(
-                              margin: const EdgeInsets.only(right: 6),
-                              width: 28,
-                              height: 28,
-                              child: CircleAvatar(
-                                radius: 14,
-                                backgroundColor: Colors.blue[100],
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 4),
-                  Row(
+                  child: Icon(statusIcon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        _formatDateDay(task.dueDate),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withAlpha((0.15 * 255).round()),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                                decoration: isCompleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
                           ),
-                        ),
+                          if (isBookmarked)
+                            const Icon(
+                              Icons.bookmark,
+                              color: Colors.blue,
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Status Badge & Deadline
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              statusText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.access_time,
+                            size: 14,
+                            color: Colors.grey[500],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDeadline(task.dueDate),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isOverdue ? Colors.red : Colors.grey[600],
+                              fontWeight: isOverdue
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            // Actions Icon (Right)
-            Column(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                    color: isBookmarked ? Colors.blue : Colors.grey[400],
-                  ),
-                  onPressed: effectiveUser == null
-                      ? null
-                      : () async {
-                          final firestore = Provider.of<FirestoreTaskService>(
-                            context,
-                            listen: false,
-                          );
-                          final messenger = ScaffoldMessenger.of(context);
-                          try {
-                            await firestore.toggleBookmark(
-                              task.id,
-                              effectiveUser.id,
-                              !isBookmarked,
-                            );
-                          } catch (_) {
-                            if (!mounted) return;
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Failed to update bookmark'),
-                              ),
-                            );
-                          }
-                        },
                 ),
               ],
             ),
+
+            if (task.assignees.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  SizedBox(
+                    height: 32,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      shrinkWrap: true,
+                      itemCount: task.assignees.length > 4
+                          ? 5
+                          : task.assignees.length,
+                      itemBuilder: (context, index) {
+                        if (index == 4) {
+                          return CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.grey[200],
+                            child: Text(
+                              '+${task.assignees.length - 4}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          );
+                        }
+                        final assigneeId = task.assignees[index];
+                        final isUserCompleted =
+                            task.completionStatus != null &&
+                            task.completionStatus!.containsKey(assigneeId);
+                        final assigneeUser = _userCache[assigneeId];
+
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Stack(
+                            children: [
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: Colors.blue[50],
+                                backgroundImage:
+                                    (assigneeUser?.profileImage?.isNotEmpty ??
+                                        false)
+                                    ? NetworkImage(assigneeUser!.profileImage!)
+                                    : null,
+                                child:
+                                    (assigneeUser?.profileImage == null ||
+                                        assigneeUser!.profileImage!.isEmpty)
+                                    ? Text(
+                                        _getUserInitials(assigneeId),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.blue[800],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              if (isUserCompleted)
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.fromBorderSide(
+                                        BorderSide(
+                                          color: Colors.white,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      size: 8,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: isBookmarked ? Colors.blue : Colors.grey[400],
+                      size: 20,
+                    ),
+                    onPressed: effectiveUser == null
+                        ? null
+                        : () async {
+                            final firestore = Provider.of<FirestoreTaskService>(
+                              context,
+                              listen: false,
+                            );
+                            try {
+                              await firestore.toggleBookmark(
+                                task.id,
+                                effectiveUser.id,
+                                !isBookmarked,
+                              );
+                            } catch (_) {}
+                          },
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _getUserInitials(String userId) {
+    final user = _userCache[userId];
+    if (user != null && user.name.isNotEmpty) {
+      return user.name[0].toUpperCase();
+    }
+    return '?';
+  }
+
+  String _formatDeadline(DateTime date) {
+    final now = DateTime.now();
+    final diff = date.difference(now);
+    if (diff.isNegative) return 'Overdue';
+    if (diff.inDays > 0) return '${diff.inDays}d left';
+    if (diff.inHours > 0) return '${diff.inHours}h left';
+    return '${diff.inMinutes}m left';
   }
 
   String _getMonthName(int month) {

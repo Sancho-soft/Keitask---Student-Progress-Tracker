@@ -7,7 +7,16 @@ import '../../../services/firestore_task_service.dart';
 import '../../../services/auth_service.dart';
 
 class CreateTaskScreen extends StatefulWidget {
-  const CreateTaskScreen({super.key});
+  final bool adminCreate;
+  final app_models.User? user;
+  final List<String>? initialAssignees; // New parameter
+
+  const CreateTaskScreen({
+    super.key,
+    this.adminCreate = false,
+    this.user,
+    this.initialAssignees,
+  });
 
   @override
   State<CreateTaskScreen> createState() => _CreateTaskScreenState();
@@ -21,13 +30,22 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   TimeOfDay _selectedTime = const TimeOfDay(hour: 10, minute: 0);
 
   final List<String> _selectedAssigneeIds = [];
+  // Allow users to suggest assignees (when non-admin submits a pending task)
+  final TextEditingController _requestedAssigneesController =
+      TextEditingController();
   bool _allowMultipleAssign = false;
   bool _isCreating = false;
 
   @override
   void initState() {
     super.initState();
-    // No default selected user here. User must choose one.
+    if (widget.initialAssignees != null &&
+        widget.initialAssignees!.isNotEmpty) {
+      _selectedAssigneeIds.addAll(widget.initialAssignees!);
+      if (widget.initialAssignees!.length > 1) {
+        _allowMultipleAssign = true;
+      }
+    }
   }
 
   // --- Date/Time Selection and Task Creation Logic (Omitting for brevity, remains the same) ---
@@ -62,19 +80,37 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     // Simple approach: fetch users from Firestore 'users' collection for selection
     // We'll load users via a stream for the choice chips below.
 
+    final args = ModalRoute.of(context)?.settings.arguments;
+    app_models.User? user = widget.user;
+    bool adminCreate = widget.adminCreate;
+    if (args is Map) {
+      if (args['user'] is app_models.User)
+        user = args['user'] as app_models.User;
+      if (args['adminCreate'] is bool)
+        adminCreate = args['adminCreate'] as bool;
+    } else if (args is app_models.User) {
+      user = args;
+    }
+
+    // Treat professors as admins for task creation purposes
+    if (user?.role == 'professor') {
+      adminCreate = true;
+    }
+
     if (_titleController.text.trim().isEmpty) {
       _showSnackBar('Please enter a task title', Colors.red);
       return;
     }
-    if (_selectedAssigneeIds.isEmpty) {
+    // allow non-admins to create pending tasks (no early return)
+    // Only enforce assignee selection for admins
+    if (adminCreate && _selectedAssigneeIds.isEmpty) {
       _showSnackBar('Please select at least one team member', Colors.red);
       return;
     }
 
     setState(() => _isCreating = true);
 
-    final args = ModalRoute.of(context)?.settings.arguments;
-    final user = (args is app_models.User) ? args : null;
+    // args, user, and adminCreate already determined above
     final creatorId = user?.id ?? 'unknown_creator';
 
     final dueDateTime = DateTime(
@@ -86,17 +122,32 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     );
 
     // Create a single Task that contains the list of selected assignees
-    final assignees = List<String>.from(_selectedAssigneeIds);
+    final assignees = adminCreate
+        ? List<String>.from(_selectedAssigneeIds)
+        : <String>[]; // non-admins don't assign users directly
+    // Try to resolve human-readable assignee names (optional)
     // Try to resolve human-readable assignee names (optional)
     final authService = Provider.of<AuthService>(context, listen: false);
     List<String>? assigneeNames;
     try {
-      final allUsers = await authService.getAllUsers();
-      assigneeNames = allUsers
-          .where((u) => assignees.contains(u.id))
-          .map((u) => u.name)
-          .toList();
-    } catch (_) {
+      if (assignees.isNotEmpty) {
+        final allUsers = await authService.getAllUsers();
+        // Map assignees to names in the SAME ORDER as the IDs
+        assigneeNames = assignees.map((id) {
+          final user = allUsers.firstWhere(
+            (u) => u.id == id,
+            orElse: () => app_models.User(
+              id: id,
+              email: '',
+              name: 'Unknown',
+              role: 'user',
+            ),
+          );
+          return user.name;
+        }).toList();
+      }
+    } catch (e) {
+      print('Error fetching assignee names: $e');
       assigneeNames = null;
     }
 
@@ -104,8 +155,17 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
-      status: 'pending',
+      status: adminCreate ? 'approved' : 'pending',
       assignees: assignees,
+      requestedAssigneeNames: adminCreate
+          ? null
+          : (_requestedAssigneesController.text.trim().isNotEmpty
+                ? _requestedAssigneesController.text
+                      .split(',')
+                      .map((s) => s.trim())
+                      .where((s) => s.isNotEmpty)
+                      .toList()
+                : null),
       assigneeNames: assigneeNames,
       dueDate: dueDateTime,
       creator: creatorId,
@@ -115,10 +175,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     if (!mounted) return;
 
     setState(() => _isCreating = false);
-    _showSnackBar(
-      'Task created successfully (Pending Admin Review)',
-      Colors.green,
-    );
+    _showSnackBar('Task created successfully', Colors.green);
     Navigator.pop(context);
   }
 
@@ -132,6 +189,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    // Removed controller since non-admin request flow was removed
     super.dispose();
   }
 
@@ -139,6 +197,15 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   Widget build(BuildContext context) {
     // Fetch Firebase users from AuthService
     final authService = Provider.of<AuthService>(context);
+    final args = ModalRoute.of(context)?.settings.arguments;
+    bool adminCreate = widget.adminCreate;
+    if (args is Map) {
+      adminCreate = args['adminCreate'] ?? false;
+    }
+    // Also check if the current user is a professor (treat as admin for creation)
+    if (widget.user?.role == 'professor') {
+      adminCreate = true;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -161,221 +228,286 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
               .toList();
 
           return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Gray Background Area for Task Title and Details
-                Container(
-                  color: Colors.grey[100],
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Task Title
-                      _buildLabel('Task Title'),
-                      _buildTextField(
-                        controller: _titleController,
-                        hint: 'Task title here',
-                        isGrayBackground: true,
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Task Details
-                      _buildLabel('Task Details'),
-                      _buildTextField(
-                        controller: _descriptionController,
-                        hint: 'Task description here',
-                        maxLines: 5,
-                        isGrayBackground: true,
-                      ),
-                    ],
-                  ),
+                _buildLabel('Task Title'),
+                _buildTextField(
+                  controller: _titleController,
+                  hint: 'Enter task title',
+                  isGrayBackground: false,
                 ),
+                const SizedBox(height: 24),
 
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                _buildLabel('Description'),
+                _buildTextField(
+                  controller: _descriptionController,
+                  hint: 'Enter task details...',
+                  maxLines: 5,
+                  isGrayBackground: false,
+                ),
+                const SizedBox(height: 24),
+
+                // Assignment Section
+                if (adminCreate) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const SizedBox(height: 8),
-
-                      // Assignment mode toggle
-                      Row(
-                        children: [
-                          Switch(
-                            value: _allowMultipleAssign,
-                            onChanged: (val) {
-                              setState(() {
-                                _allowMultipleAssign = val;
+                      _buildLabel('Assign Members'),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          children: [
+                            _buildToggleOption(
+                              'Single',
+                              !_allowMultipleAssign,
+                              () => setState(() {
+                                _allowMultipleAssign = false;
                                 _selectedAssigneeIds.clear();
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _allowMultipleAssign
-                                ? 'Multiple Assign'
-                                : 'Single Assign',
-                          ),
-                        ],
-                      ),
-                      _buildLabel('Assign to'),
-                      snapshot.connectionState == ConnectionState.waiting
-                          ? const SizedBox(
-                              height: 50,
-                              child: Center(child: CircularProgressIndicator()),
-                            )
-                          : assignableUsers.isEmpty
-                          ? Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'No team members available',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            )
-                          : _allowMultipleAssign
-                          ? Wrap(
-                              spacing: 8,
-                              children: assignableUsers.map((user) {
-                                final selected = _selectedAssigneeIds.contains(
-                                  user.id,
-                                );
-                                return FilterChip(
-                                  label: Text(user.name),
-                                  selected: selected,
-                                  onSelected: (val) {
-                                    setState(() {
-                                      if (val) {
-                                        _selectedAssigneeIds.add(user.id);
-                                      } else {
-                                        _selectedAssigneeIds.remove(user.id);
-                                      }
-                                    });
-                                  },
-                                );
-                              }).toList(),
-                            )
-                          : DropdownButton<String>(
-                              isExpanded: true,
-                              value: _selectedAssigneeIds.isNotEmpty
-                                  ? _selectedAssigneeIds.first
-                                  : null,
-                              hint: const Text('Select a team member'),
-                              items: assignableUsers.map((user) {
-                                return DropdownMenuItem<String>(
-                                  value: user.id,
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.person_outline,
-                                        size: 18,
-                                        color: Colors.blue,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          user.name,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        user.email,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _selectedAssigneeIds
-                                    ..clear()
-                                    ..add(newValue!);
-                                });
-                              },
-                              underline: Container(
-                                height: 1,
-                                color: Colors.grey[300],
-                              ),
+                              }),
                             ),
-                      const SizedBox(height: 24),
-
-                      // Time & Date Pickers
-                      _buildLabel('Time & Date'),
-                      Row(
-                        children: [
-                          // Time Picker
-                          Expanded(
-                            child: _buildDateTimePickerBox(
-                              context,
-                              onTap: () => _selectTime(context),
-                              icon: Icons.access_time,
-                              text: _selectedTime.format(context),
+                            _buildToggleOption(
+                              'Multiple',
+                              _allowMultipleAssign,
+                              () => setState(() {
+                                _allowMultipleAssign = true;
+                                _selectedAssigneeIds.clear();
+                              }),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          // Date Picker
-                          Expanded(
-                            child: _buildDateTimePickerBox(
-                              context,
-                              onTap: () => _selectDate(context),
-                              icon: Icons.calendar_today,
-                              text:
-                                  '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Create Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isCreating ? null : _createTask,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: _isCreating
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'Create',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+
+                  if (snapshot.connectionState == ConnectionState.waiting) ...[
+                    const Center(child: CircularProgressIndicator()),
+                  ] else if (assignableUsers.isEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: const Text(
+                        'No team members available to assign.',
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ),
+                  ] else ...[
+                    if (_allowMultipleAssign) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: assignableUsers.isEmpty
+                            ? const Text('No users found')
+                            : Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: assignableUsers.map((user) {
+                                  final selected = _selectedAssigneeIds
+                                      .contains(user.id);
+                                  return FilterChip(
+                                    label: Text(user.name),
+                                    selected: selected,
+                                    onSelected: (val) {
+                                      setState(() {
+                                        if (val) {
+                                          _selectedAssigneeIds.add(user.id);
+                                        } else {
+                                          _selectedAssigneeIds.remove(user.id);
+                                        }
+                                      });
+                                    },
+                                    avatar: CircleAvatar(
+                                      backgroundImage:
+                                          (user.profileImage ?? '').isNotEmpty
+                                          ? NetworkImage(user.profileImage!)
+                                          : null,
+                                      child: (user.profileImage ?? '').isEmpty
+                                          ? Text(
+                                              user.name.isNotEmpty
+                                                  ? user.name[0]
+                                                  : '?',
+                                            )
+                                          : null,
+                                    ),
+                                    selectedColor: Colors.blue[100],
+                                    checkmarkColor: Colors.blue,
+                                  );
+                                }).toList(),
+                              ),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: _selectedAssigneeIds.isNotEmpty
+                                ? _selectedAssigneeIds.first
+                                : null,
+                            hint: const Text('Select a team member'),
+                            icon: const Icon(Icons.arrow_drop_down),
+                            items: assignableUsers.map((user) {
+                              return DropdownMenuItem<String>(
+                                value: user.id,
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 12,
+                                      backgroundImage:
+                                          (user.profileImage ?? '').isNotEmpty
+                                          ? NetworkImage(user.profileImage!)
+                                          : null,
+                                      child: (user.profileImage ?? '').isEmpty
+                                          ? Text(
+                                              user.name.isNotEmpty
+                                                  ? user.name[0].toUpperCase()
+                                                  : '?',
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            user.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  _selectedAssigneeIds
+                                    ..clear()
+                                    ..add(newValue);
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ] else ...[
+                  // Non-admin suggestion field
+                  _buildLabel('Suggest Assignees (Optional)'),
+                  TextField(
+                    controller: _requestedAssigneesController,
+                    decoration: InputDecoration(
+                      hintText: 'e.g., John Doe, Jane Smith',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+
+                // Time & Date Pickers
+                _buildLabel('Due Date & Time'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateTimePickerBox(
+                        context,
+                        onTap: () => _selectDate(context),
+                        icon: Icons.calendar_today,
+                        text:
+                            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                        label: 'Date',
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDateTimePickerBox(
+                        context,
+                        onTap: () => _selectTime(context),
+                        icon: Icons.access_time,
+                        text: _selectedTime.format(context),
+                        label: 'Time',
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 40),
+
+                // Create Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isCreating ? null : _createTask,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: _isCreating
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : const Text(
+                            'Create Task',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
           );
@@ -425,11 +557,32 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     );
   }
 
+  Widget _buildToggleOption(String title, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDateTimePickerBox(
     BuildContext context, {
     required VoidCallback onTap,
     required IconData icon,
     required String text,
+    String? label,
   }) {
     return InkWell(
       onTap: onTap,
@@ -437,22 +590,37 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 20, color: Colors.blue),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+            if (label != null) ...[
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
                 ),
-                textAlign: TextAlign.end,
               ),
+              const SizedBox(height: 4),
+            ],
+            Row(
+              children: [
+                Icon(icon, size: 20, color: Colors.blue),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

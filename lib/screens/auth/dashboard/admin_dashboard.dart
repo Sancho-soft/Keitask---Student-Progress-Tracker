@@ -6,6 +6,7 @@ import '../../../models/user_model.dart';
 import '../../../services/task_service.dart';
 import '../../../services/firestore_task_service.dart';
 import '../../../services/auth_service.dart';
+import '../../admin/task_statistics_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   final User user;
@@ -250,10 +251,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             onPressed: () {
                               // Navigates to the dedicated approval screen (Tasks tab)
                               // Note: AdminTasksApprovalScreen uses this same data source.
-                              Navigator.pushNamed(
+                              Navigator.push(
                                 context,
-                                '/tasks',
-                                arguments: widget.user,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const TaskStatisticsScreen(),
+                                ),
                               ).then((_) => _refresh());
                             },
                             child: const Text(

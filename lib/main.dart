@@ -62,7 +62,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'KeiTask Management',
+      title: 'KeiTask Student Progress Tracker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme:

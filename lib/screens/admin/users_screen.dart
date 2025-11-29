@@ -1,75 +1,456 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
-import '../../models/user_model.dart' as app_models;
+import '../auth/tasks/create_task_screen.dart';
 
 class UsersScreen extends StatefulWidget {
-  const UsersScreen({super.key});
+  final bool showBackButton;
+  const UsersScreen({super.key, this.showBackButton = true});
 
   @override
   State<UsersScreen> createState() => _UsersScreenState();
 }
 
 class _UsersScreenState extends State<UsersScreen> {
+  String _filter = 'all'; // 'all', 'professor', 'student'
+  final Set<String> _selectedUserIds = {};
+  bool _isSelectionMode = false;
+
+  void _toggleSelection(String userId) {
+    setState(() {
+      if (_selectedUserIds.contains(userId)) {
+        _selectedUserIds.remove(userId);
+        if (_selectedUserIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedUserIds.add(userId);
+        _isSelectionMode = true;
+      }
+    });
+  }
+
+  void _assignTaskToSelected(BuildContext context, User currentUser) {
+    if (_selectedUserIds.isEmpty) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTaskScreen(
+          user: currentUser,
+          adminCreate: true, // Professors/Admins assigning tasks
+          initialAssignees: _selectedUserIds.toList(),
+        ),
+      ),
+    ).then((_) {
+      // Clear selection after returning
+      setState(() {
+        _selectedUserIds.clear();
+        _isSelectionMode = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context);
+    final currentUser = authService.appUser;
+    final isProfessor = currentUser?.role == 'professor';
+    final isAdmin = currentUser?.role == 'admin';
+
+    // Force filter for professors if not already set
+    if (isProfessor && _filter != 'student') {
+      _filter = 'student';
+    }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Users'), elevation: 0),
-      body: StreamBuilder<List<app_models.User>>(
-        stream: auth.usersStream(),
+      appBar: AppBar(
+        title: Text(
+          _isSelectionMode
+              ? '${_selectedUserIds.length} Selected'
+              : (isProfessor ? 'My Students' : 'Manage Users'),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        automaticallyImplyLeading: false,
+        leading: widget.showBackButton || _isSelectionMode
+            ? IconButton(
+                icon: Icon(_isSelectionMode ? Icons.close : Icons.arrow_back),
+                onPressed: () {
+                  if (_isSelectionMode) {
+                    setState(() {
+                      _selectedUserIds.clear();
+                      _isSelectionMode = false;
+                    });
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
+              )
+            : null,
+        actions: [
+          if (!isProfessor && !_isSelectionMode)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.filter_list),
+              onSelected: (value) => setState(() => _filter = value),
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'all', child: Text('All Users')),
+                const PopupMenuItem(
+                  value: 'professor',
+                  child: Text('Professors'),
+                ),
+                const PopupMenuItem(value: 'student', child: Text('Students')),
+              ],
+            ),
+        ],
+      ),
+      body: StreamBuilder<List<User>>(
+        stream: authService.usersStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final users = snapshot.data ?? [];
-          if (users.isEmpty) {
-            return const Center(child: Text('No users found'));
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
-          return ListView.separated(
-            itemCount: users.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
+
+          final users = snapshot.data ?? [];
+          final filteredUsers = users.where((user) {
+            // Exclude self
+            if (user.id == currentUser?.id) return false;
+
+            if (_filter == 'all') return true;
+            return user.role == _filter;
+          }).toList();
+
+          if (filteredUsers.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No users found.', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            itemCount: filteredUsers.length,
             itemBuilder: (context, index) {
-              final u = users[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: u.profileImage != null
-                      ? NetworkImage(u.profileImage!)
-                      : null,
-                  child: u.profileImage == null
-                      ? const Icon(Icons.person)
-                      : null,
+              final user = filteredUsers[index];
+              final isUserProfessor = user.role == 'professor';
+              final isSelected = _selectedUserIds.contains(user.id);
+
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: isSelected
+                      ? const BorderSide(color: Colors.blue, width: 2)
+                      : BorderSide.none,
                 ),
-                title: Text(u.name),
-                subtitle: Text(u.email),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    final messenger = ScaffoldMessenger.of(context);
-                    if (value == 'promote') {
-                      await auth.updateUserRole(u.id, 'admin');
-                      if (!mounted) return;
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('User promoted to admin')),
-                      );
-                    } else if (value == 'demote') {
-                      await auth.updateUserRole(u.id, 'user');
-                      if (!mounted) return;
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('User demoted to user')),
-                      );
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    if (u.role != 'admin')
-                      const PopupMenuItem(
-                        value: 'promote',
-                        child: Text('Make admin'),
-                      )
-                    else
-                      const PopupMenuItem(
-                        value: 'demote',
-                        child: Text('Remove admin'),
+                color: isSelected ? Colors.blue.withAlpha(20) : null,
+                child: Column(
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+                      onTap: () {
+                        if (_isSelectionMode) {
+                          _toggleSelection(user.id);
+                        } else if (!isProfessor) {
+                          // Admin tap behavior
+                        }
+                      },
+                      onLongPress: () {
+                        if (isProfessor || isAdmin) {
+                          _toggleSelection(user.id);
+                        }
+                      },
+                      leading: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundImage:
+                                user.profileImage != null &&
+                                    user.profileImage!.isNotEmpty
+                                ? NetworkImage(user.profileImage!)
+                                : null,
+                            child:
+                                (user.profileImage == null ||
+                                    user.profileImage!.isEmpty)
+                                ? Text(
+                                    user.name.isNotEmpty
+                                        ? user.name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          if (isSelected)
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          if (user.isBanned)
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.block,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      title: Text(
+                        user.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          decoration: user.isBanned
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: user.isBanned ? Colors.grey : null,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(user.email),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isUserProfessor
+                                      ? Colors.purple[100]
+                                      : Colors.blue[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  user.role.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: isUserProfessor
+                                        ? Colors.purple[800]
+                                        : Colors.blue[800],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              if (isUserProfessor && !user.isApproved) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange[100],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    'PENDING',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.orange[800],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              if (user.isBanned) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red[100],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    'BANNED',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.red[800],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                      trailing:
+                          (!isProfessor && isUserProfessor && !user.isBanned)
+                          ? Switch(
+                              value: user.isApproved,
+                              onChanged: (value) async {
+                                try {
+                                  await authService.updateUserApproval(
+                                    user.id,
+                                    value,
+                                  );
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        value
+                                            ? 'Professor approved'
+                                            : 'Professor approval revoked',
+                                      ),
+                                      duration: const Duration(seconds: 1),
+                                      backgroundColor: value
+                                          ? Colors.green
+                                          : Colors.orange,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error: $e')),
+                                  );
+                                }
+                              },
+                              activeColor: Colors.green,
+                            )
+                          : (_isSelectionMode
+                                ? Checkbox(
+                                    value: isSelected,
+                                    onChanged: (val) =>
+                                        _toggleSelection(user.id),
+                                  )
+                                : null),
+                    ),
+                    // Admin Actions Row
+                    if (isAdmin && !_isSelectionMode)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          bottom: 8,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (!isUserProfessor) // Only ban students (or non-professors)
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text(
+                                        user.isBanned
+                                            ? 'Unban User'
+                                            : 'Ban User',
+                                      ),
+                                      content: Text(
+                                        user.isBanned
+                                            ? 'Are you sure you want to unban ${user.name}?'
+                                            : 'Are you sure you want to ban ${user.name}? They will be signed out immediately.',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: Text(
+                                            user.isBanned ? 'Unban' : 'Ban',
+                                            style: TextStyle(
+                                              color: user.isBanned
+                                                  ? Colors.green
+                                                  : Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirm == true) {
+                                    try {
+                                      await authService.banUser(
+                                        user.id,
+                                        !user.isBanned,
+                                      );
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            user.isBanned
+                                                ? 'User unbanned'
+                                                : 'User banned',
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      if (!mounted) return;
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text('Error: $e')),
+                                      );
+                                    }
+                                  }
+                                },
+                                icon: Icon(
+                                  user.isBanned
+                                      ? Icons.check_circle
+                                      : Icons.block,
+                                  size: 16,
+                                  color: user.isBanned
+                                      ? Colors.green
+                                      : Colors.red,
+                                ),
+                                label: Text(
+                                  user.isBanned ? 'Unban' : 'Ban',
+                                  style: TextStyle(
+                                    color: user.isBanned
+                                        ? Colors.green
+                                        : Colors.red,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                   ],
                 ),
@@ -78,6 +459,18 @@ class _UsersScreenState extends State<UsersScreen> {
           );
         },
       ),
+      floatingActionButton: _selectedUserIds.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                if (currentUser != null) {
+                  _assignTaskToSelected(context, currentUser);
+                }
+              },
+              label: const Text('Assign Task'),
+              icon: const Icon(Icons.assignment_add),
+              backgroundColor: Colors.blue,
+            )
+          : null,
     );
   }
 }

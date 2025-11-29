@@ -12,6 +12,8 @@ class TaskService extends ChangeNotifier {
     _userNameCache.addAll(userNames);
   }
 
+  Map<String, String> get userNames => _userNameCache;
+
   // Getter for a user's name (used by Leaderboard)
   String getUserName(String userId) {
     // Return cached name or default

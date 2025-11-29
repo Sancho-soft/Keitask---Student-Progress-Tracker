@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart' as app_models;
 
 class FirestoreTaskService extends ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  CollectionReference get _tasksRef => _firestore.collection('tasks');
+
   Future<void> resubmitTask(String taskId) async {
     await _tasksRef.doc(taskId).update({
       'status': 'resubmitted',
@@ -10,9 +13,6 @@ class FirestoreTaskService extends ChangeNotifier {
     });
     notifyListeners();
   }
-
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  CollectionReference get _tasksRef => _firestore.collection('tasks');
 
   Stream<List<app_models.Task>> tasksStream() {
     return _tasksRef.snapshots().map(
@@ -37,6 +37,7 @@ class FirestoreTaskService extends ChangeNotifier {
   }
 
   Future<void> createTask(app_models.Task task) async {
+    // Persist all task fields including courseId, grades, etc.
     await _tasksRef.doc(task.id).set(task.toJson());
     notifyListeners();
   }
@@ -76,11 +77,107 @@ class FirestoreTaskService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> markTaskComplete(String taskId) async {
-    await _tasksRef.doc(taskId).update({
-      'status': 'completed',
-      'completedAt': FieldValue.serverTimestamp(),
-      'rejectionReason': null,
+  Future<void> markTaskComplete(
+    String taskId, {
+    String? completedBy,
+    int rewardPoints = 10,
+  }) async {
+    // If completedBy is provided, we track per-user completion
+    if (completedBy != null && completedBy.isNotEmpty) {
+      final taskRef = _tasksRef.doc(taskId);
+      final taskDoc = await taskRef.get();
+      if (!taskDoc.exists) return;
+
+      final taskData = taskDoc.data() as Map<String, dynamic>;
+      final assignees = List<String>.from(taskData['assignees'] ?? []);
+
+      // Update completion status for this user
+      await taskRef.update({
+        'completionStatus.$completedBy': DateTime.now().toIso8601String(),
+      });
+
+      // Award points to the user who completed the task
+      final usersRef = _firestore.collection('users');
+      await usersRef.doc(completedBy).update({
+        'points': FieldValue.increment(rewardPoints),
+      });
+
+      // Check if all assignees have completed
+      final completionStatus = Map<String, dynamic>.from(
+        taskData['completionStatus'] ?? {},
+      );
+      completionStatus[completedBy] = DateTime.now()
+          .toIso8601String(); // Add current update to local check
+
+      bool allCompleted = true;
+      if (assignees.isNotEmpty) {
+        for (var assignee in assignees) {
+          if (!completionStatus.containsKey(assignee)) {
+            allCompleted = false;
+            break;
+          }
+        }
+      } else {
+        // If no assignees, mark as completed
+        allCompleted = true;
+      }
+
+      if (allCompleted) {
+        await taskRef.update({
+          'status': 'completed',
+          'completedAt': FieldValue.serverTimestamp(),
+          'rejectionReason': null,
+        });
+      }
+    } else {
+      // Fallback for legacy calls or admin overrides
+      final updates = <String, Object?>{
+        'status': 'completed',
+        'completedAt': FieldValue.serverTimestamp(),
+        'rejectionReason': null,
+      };
+      await _tasksRef.doc(taskId).update(updates);
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> submitTask(
+    String taskId,
+    String userId,
+    List<String> fileUrls,
+  ) async {
+    final taskRef = _tasksRef.doc(taskId);
+    final taskDoc = await taskRef.get();
+    if (!taskDoc.exists) return;
+
+    final taskData = taskDoc.data() as Map<String, dynamic>;
+    final currentSubmissions = Map<String, dynamic>.from(
+      taskData['submissions'] ?? {},
+    );
+    currentSubmissions[userId] = fileUrls;
+
+    final currentCompletionStatus = Map<String, dynamic>.from(
+      taskData['completionStatus'] ?? {},
+    );
+    currentCompletionStatus[userId] = DateTime.now().toIso8601String();
+
+    // Check if all assignees have completed
+    final assignees = List<String>.from(taskData['assignees'] ?? []);
+    bool allCompleted = true;
+    for (final assignee in assignees) {
+      if (assignee == userId) continue;
+      if (!currentCompletionStatus.containsKey(assignee)) {
+        allCompleted = false;
+        break;
+      }
+    }
+
+    await taskRef.update({
+      'submissions': currentSubmissions,
+      'completionStatus': currentCompletionStatus,
+      if (allCompleted) 'status': 'completed',
+      if (allCompleted) 'completedAt': FieldValue.serverTimestamp(),
     });
     notifyListeners();
   }

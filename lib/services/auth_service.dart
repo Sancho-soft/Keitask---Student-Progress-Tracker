@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
@@ -10,6 +12,7 @@ import '../config/cloudinary_config.dart';
 import '../models/user_model.dart' as app_models;
 
 class AuthService extends ChangeNotifier {
+  final GoogleSignIn? _googleSignIn = kIsWeb ? null : GoogleSignIn();
   Future<void> sendPasswordResetEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
@@ -56,9 +59,34 @@ class AuthService extends ChangeNotifier {
         email: firebaseUser?.email ?? '',
         name: firebaseUser?.displayName ?? '',
         role: 'user',
+        points: 0,
+        isApproved: true,
       );
       await _firestore.collection('users').doc(uid).set(u.toJson());
       appUser = u;
+    }
+  }
+
+  Future<void> incrementUserPoints(String uid, int by) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'points': FieldValue.increment(by),
+      });
+      // If current appUser is the target, update in-memory copy
+      if (appUser != null && appUser!.id == uid) {
+        appUser = app_models.User(
+          id: appUser!.id,
+          email: appUser!.email,
+          name: appUser!.name,
+          role: appUser!.role,
+          profileImage: appUser!.profileImage,
+          points: (appUser!.points) + by,
+          isApproved: appUser!.isApproved,
+        );
+        notifyListeners();
+      }
+    } catch (_) {
+      rethrow;
     }
   }
 
@@ -186,6 +214,7 @@ class AuthService extends ChangeNotifier {
       name: name,
       role: role,
       profileImage: photoUrl,
+      isApproved: role != 'professor', // Professors need approval
     );
     await _firestore.collection('users').doc(uid).set(userRecord.toJson());
     appUser = userRecord;
@@ -208,10 +237,71 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    try {
+      // On mobile, sign out of the google sign-in plugin as well
+      await _googleSignIn?.signOut();
+    } catch (_) {}
     await _auth.signOut();
     appUser = null;
     firebaseUser = null;
     notifyListeners();
+  }
+
+  /// Sign in using Google for both web and mobile platforms.
+  /// For web, uses Firebase Auth popup. For mobile, uses the google_sign_in plugin
+  /// to obtain credentials and signs in with Firebase.
+  Future<app_models.User?> signInWithGoogle() async {
+    try {
+      fb_auth.UserCredential credential;
+      if (kIsWeb) {
+        final provider = fb_auth.GoogleAuthProvider();
+        credential = await _auth.signInWithPopup(provider);
+      } else {
+        final googleUser = await _googleSignIn!.signIn();
+        if (googleUser == null) return null; // user canceled
+        final googleAuth = await googleUser.authentication;
+        final cred = fb_auth.GoogleAuthProvider.credential(
+          idToken: googleAuth.idToken,
+          accessToken: googleAuth.accessToken,
+        );
+        credential = await _auth.signInWithCredential(cred);
+      }
+
+      final fbUser = credential.user;
+      if (fbUser == null) return null;
+
+      // Save/update user info in Firestore as needed
+      final uid = fbUser.uid;
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        // Update displayName/photo if changed
+        final data = userDoc.data()!;
+        final existing = app_models.User.fromJson(data);
+        final displayName = fbUser.displayName ?? existing.name;
+        final photoUrl = fbUser.photoURL ?? existing.profileImage;
+        await _firestore.collection('users').doc(uid).update({
+          'name': displayName,
+          'profileImage': photoUrl,
+        });
+      } else {
+        final newUser = app_models.User(
+          id: uid,
+          email: fbUser.email ?? '',
+          name: fbUser.displayName ?? '',
+          role: 'user',
+          profileImage: fbUser.photoURL,
+          isApproved: true,
+          isBanned: false,
+        );
+        await _firestore.collection('users').doc(uid).set(newUser.toJson());
+      }
+
+      await _loadAppUser(uid);
+      notifyListeners();
+      return appUser;
+    } catch (e) {
+      rethrow;
+    }
   }
 
   // Admin helpers
@@ -226,7 +316,11 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> updateUserRole(String uid, String role) async {
-    await _firestore.collection('users').doc(uid).update({'role': role});
+    // When admin changes role, we assume the user is approved.
+    await _firestore.collection('users').doc(uid).update({
+      'role': role,
+      'isApproved': true,
+    });
     if (appUser?.id == uid) {
       appUser = app_models.User(
         id: appUser!.id,
@@ -234,8 +328,61 @@ class AuthService extends ChangeNotifier {
         name: appUser!.name,
         role: role,
         profileImage: appUser!.profileImage,
+        isApproved: true,
+        phoneNumber: appUser!.phoneNumber,
+        isBanned: appUser!.isBanned,
       );
       notifyListeners();
+    }
+  }
+
+  Future<void> approveUser(String uid) async {
+    await updateUserApproval(uid, true);
+  }
+
+  Future<void> updateUserApproval(String uid, bool isApproved) async {
+    await _firestore.collection('users').doc(uid).update({
+      'isApproved': isApproved,
+    });
+    // If we are updating the current user
+    if (appUser?.id == uid) {
+      appUser = app_models.User(
+        id: appUser!.id,
+        email: appUser!.email,
+        name: appUser!.name,
+        role: appUser!.role,
+        profileImage: appUser!.profileImage,
+        points: appUser!.points,
+        isApproved: isApproved,
+        phoneNumber: appUser!.phoneNumber,
+        isBanned: appUser!.isBanned,
+      );
+      notifyListeners();
+    }
+  }
+
+  Future<void> banUser(String uid, bool isBanned) async {
+    await _firestore.collection('users').doc(uid).update({
+      'isBanned': isBanned,
+    });
+    // If we are updating the current user (unlikely to ban self, but possible)
+    if (appUser?.id == uid) {
+      if (isBanned) {
+        await signOut();
+      } else {
+        appUser = app_models.User(
+          id: appUser!.id,
+          email: appUser!.email,
+          name: appUser!.name,
+          role: appUser!.role,
+          profileImage: appUser!.profileImage,
+          points: appUser!.points,
+          isApproved: appUser!.isApproved,
+          phoneNumber: appUser!.phoneNumber,
+          isBanned: isBanned,
+        );
+        notifyListeners();
+      }
     }
   }
 
@@ -243,6 +390,15 @@ class AuthService extends ChangeNotifier {
   Future<void> updateCurrentUserRole(String role) async {
     if (firebaseUser != null) {
       await updateUserRole(firebaseUser!.uid, role);
+    }
+  }
+
+  /// Reloads the current appUser from Firestore. Useful after mutations in
+  /// other providers to get an accurate in-memory view.
+  Future<void> reloadCurrentUser() async {
+    if (firebaseUser != null) {
+      await _loadAppUser(firebaseUser!.uid);
+      notifyListeners();
     }
   }
 
@@ -257,6 +413,9 @@ class AuthService extends ChangeNotifier {
           name: newName,
           role: appUser!.role,
           profileImage: appUser!.profileImage,
+          isApproved: appUser!.isApproved,
+          phoneNumber: appUser!.phoneNumber,
+          isBanned: appUser!.isBanned,
         );
         await _firestore.collection('users').doc(firebaseUser!.uid).update({
           'name': newName,
@@ -278,9 +437,36 @@ class AuthService extends ChangeNotifier {
           name: appUser!.name,
           role: appUser!.role,
           profileImage: imageUrl,
+          isApproved: appUser!.isApproved,
+          phoneNumber: appUser!.phoneNumber,
+          isBanned: appUser!.isBanned,
         );
         await _firestore.collection('users').doc(firebaseUser!.uid).update({
           'profileImage': imageUrl,
+        });
+        notifyListeners();
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Update user phone number
+  Future<void> updateUserPhone(String phoneNumber) async {
+    try {
+      if (appUser != null) {
+        appUser = app_models.User(
+          id: appUser!.id,
+          email: appUser!.email,
+          name: appUser!.name,
+          role: appUser!.role,
+          profileImage: appUser!.profileImage,
+          isApproved: appUser!.isApproved,
+          phoneNumber: phoneNumber,
+          isBanned: appUser!.isBanned,
+        );
+        await _firestore.collection('users').doc(firebaseUser!.uid).update({
+          'phoneNumber': phoneNumber,
         });
         notifyListeners();
       }
