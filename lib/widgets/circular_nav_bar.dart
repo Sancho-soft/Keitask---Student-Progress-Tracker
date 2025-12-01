@@ -77,7 +77,9 @@ class CircularNavBar extends StatelessWidget {
                                   items[i].icon,
                                   color: isSelected
                                       ? theme.colorScheme.primary
-                                      : Colors.black87,
+                                      : theme.colorScheme.onSurface.withAlpha(
+                                          220,
+                                        ),
                                   size: isSelected ? 28 : 24,
                                 ),
                               ),
@@ -92,7 +94,9 @@ class CircularNavBar extends StatelessWidget {
                                 fontSize: 11,
                                 color: isSelected
                                     ? theme.colorScheme.primary
-                                    : Colors.black54,
+                                    : theme.colorScheme.onSurface.withAlpha(
+                                        150,
+                                      ),
                                 fontWeight: isSelected
                                     ? FontWeight.w700
                                     : FontWeight.normal,

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../auth/tasks/create_task_screen.dart';
+import '../../widgets/flash_message.dart';
 
 class UsersScreen extends StatefulWidget {
   final bool showBackButton;
@@ -123,6 +125,9 @@ class _UsersScreenState extends State<UsersScreen> {
             if (user.id == currentUser?.id) return false;
 
             if (_filter == 'all') return true;
+            if (_filter == 'student') {
+              return user.role == 'student' || user.role == 'user';
+            }
             return user.role == _filter;
           }).toList();
 
@@ -256,7 +261,10 @@ class _UsersScreenState extends State<UsersScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  user.role.toUpperCase(),
+                                  (user.role == 'user' ||
+                                          user.role == 'student')
+                                      ? 'STUDENT'
+                                      : user.role.toUpperCase(),
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: isUserProfessor
@@ -449,6 +457,98 @@ class _UsersScreenState extends State<UsersScreen> {
                                   ),
                                 ),
                               ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: () async {
+                                // Open dialog for title/body and call Cloud Function sendToUids
+                                final titleController = TextEditingController();
+                                final bodyController = TextEditingController();
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Send Notification'),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TextField(
+                                          controller: titleController,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Title',
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        TextField(
+                                          controller: bodyController,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Message',
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text('Send'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (ok != true) return;
+                                final title = titleController.text.trim();
+                                final body = bodyController.text.trim();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Sending notification...'),
+                                  ),
+                                );
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('notifications')
+                                      .add({
+                                        'recipientId': user.id,
+                                        'title': title,
+                                        'body': body,
+                                        'createdAt':
+                                            FieldValue.serverTimestamp(),
+                                        'read': false,
+                                        'type': 'admin_message',
+                                      });
+
+                                  if (!context.mounted) return;
+                                  FlashMessage.show(
+                                    context,
+                                    message:
+                                        'Notification sent to ${user.name}',
+                                    type: FlashMessageType.success,
+                                  );
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  FlashMessage.show(
+                                    context,
+                                    message: 'Error sending notification: $e',
+                                    type: FlashMessageType.error,
+                                  );
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.campaign,
+                                size: 16,
+                                color: Colors.blue,
+                              ),
+                              label: const Text(
+                                'Send Notification',
+                                style: TextStyle(
+                                  color: Colors.blue,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -460,15 +560,108 @@ class _UsersScreenState extends State<UsersScreen> {
         },
       ),
       floatingActionButton: _selectedUserIds.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                if (currentUser != null) {
-                  _assignTaskToSelected(context, currentUser);
-                }
-              },
-              label: const Text('Assign Task'),
-              icon: const Icon(Icons.assignment_add),
-              backgroundColor: Colors.blue,
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.extended(
+                  onPressed: () {
+                    if (currentUser != null) {
+                      _assignTaskToSelected(context, currentUser);
+                    }
+                  },
+                  label: const Text('Assign Task'),
+                  icon: const Icon(Icons.assignment_add),
+                  backgroundColor: Colors.blue,
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  onPressed: () async {
+                    // Show dialog for title/message, then call cloud function for _selectedUserIds
+                    final titleController = TextEditingController();
+                    final bodyController = TextEditingController();
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Send Notification to Selected'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              controller: titleController,
+                              decoration: const InputDecoration(
+                                hintText: 'Title',
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: bodyController,
+                              decoration: const InputDecoration(
+                                hintText: 'Message',
+                              ),
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Send'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                    final title = titleController.text.trim();
+                    final body = bodyController.text.trim();
+                    try {
+                      final firestore = FirebaseFirestore.instance;
+                      final batch = firestore.batch();
+                      final timestamp = FieldValue.serverTimestamp();
+
+                      for (final uid in _selectedUserIds) {
+                        final docRef = firestore
+                            .collection('notifications')
+                            .doc();
+                        batch.set(docRef, {
+                          'recipientId': uid,
+                          'title': title,
+                          'body': body,
+                          'createdAt': timestamp,
+                          'read': false,
+                          'type': 'admin_message',
+                        });
+                      }
+
+                      await batch.commit();
+
+                      if (!context.mounted) return;
+                      FlashMessage.show(
+                        context,
+                        message:
+                            'Notifications sent to ${_selectedUserIds.length} users',
+                        type: FlashMessageType.success,
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      FlashMessage.show(
+                        context,
+                        message: 'Error sending notifications: $e',
+                        type: FlashMessageType.error,
+                      );
+                    }
+                    setState(() {
+                      _selectedUserIds.clear();
+                      _isSelectionMode = false;
+                    });
+                  },
+                  label: const Text('Send Notification'),
+                  icon: const Icon(Icons.campaign),
+                  backgroundColor: Colors.green,
+                ),
+              ],
             )
           : null,
     );

@@ -93,7 +93,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
 
     // Treat professors as admins for task creation purposes
-    if (user?.role == 'professor') {
+    if (user?.role.toLowerCase() == 'professor' ||
+        user?.role.toLowerCase() == 'admin') {
       adminCreate = true;
     }
 
@@ -198,12 +199,23 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     // Fetch Firebase users from AuthService
     final authService = Provider.of<AuthService>(context);
     final args = ModalRoute.of(context)?.settings.arguments;
+    app_models.User? user = widget.user;
     bool adminCreate = widget.adminCreate;
+
     if (args is Map) {
-      adminCreate = args['adminCreate'] ?? false;
+      if (args['user'] is app_models.User) {
+        user = args['user'] as app_models.User;
+      }
+      if (args['adminCreate'] is bool) {
+        adminCreate = args['adminCreate'] as bool;
+      }
+    } else if (args is app_models.User) {
+      user = args;
     }
-    // Also check if the current user is a professor (treat as admin for creation)
-    if (widget.user?.role == 'professor') {
+
+    // Treat professors as admins for task creation purposes
+    if (user?.role.toLowerCase() == 'professor' ||
+        user?.role.toLowerCase() == 'admin') {
       adminCreate = true;
     }
 
@@ -222,9 +234,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       body: StreamBuilder<List<app_models.User>>(
         stream: authService.getAllUsersStream(),
         builder: (context, snapshot) {
-          // Filter out admin users
+          // Filter out admin users and the current user (if professor)
           final assignableUsers = (snapshot.data ?? [])
-              .where((user) => user.role != 'admin')
+              .where((u) => u.role != 'admin' && u.id != widget.user?.id)
               .toList();
 
           return SingleChildScrollView(
@@ -252,38 +264,38 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 // Assignment Section
                 if (adminCreate) ...[
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildLabel('Assign Members'),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(20),
+                      Transform.scale(
+                        scale: 0.8,
+                        child: Switch(
+                          value: _allowMultipleAssign,
+                          onChanged: (val) {
+                            setState(() {
+                              _allowMultipleAssign = val;
+                              // Optional: Preserve selection if possible, otherwise clear
+                              // For now, clearing to avoid state mismatch issues as per previous logic
+                              _selectedAssigneeIds.clear();
+                            });
+                          },
+                          activeColor: Colors.white,
+                          activeTrackColor: Colors.blue,
                         ),
-                        child: Row(
-                          children: [
-                            _buildToggleOption(
-                              'Single',
-                              !_allowMultipleAssign,
-                              () => setState(() {
-                                _allowMultipleAssign = false;
-                                _selectedAssigneeIds.clear();
-                              }),
-                            ),
-                            _buildToggleOption(
-                              'Multiple',
-                              _allowMultipleAssign,
-                              () => setState(() {
-                                _allowMultipleAssign = true;
-                                _selectedAssigneeIds.clear();
-                              }),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _allowMultipleAssign
+                            ? 'Multiple Assign'
+                            : 'Single Assign',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
+                  _buildLabel('Assign to'),
 
                   if (snapshot.connectionState == ConnectionState.waiting) ...[
                     const Center(child: CircularProgressIndicator()),
@@ -552,26 +564,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 12,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleOption(String title, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.blue : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey[600],
-            fontWeight: FontWeight.w600,
-          ),
         ),
       ),
     );

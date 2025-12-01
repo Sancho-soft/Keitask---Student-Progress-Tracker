@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/flash_message.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'forgot_password_screen.dart';
@@ -20,11 +21,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (_emailController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter email and password'),
-          backgroundColor: Colors.red,
-        ),
+      FlashMessage.show(
+        context,
+        message: 'Please enter email and password',
+        type: FlashMessageType.warning,
       );
       return;
     }
@@ -32,7 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final auth = Provider.of<AuthService>(context, listen: false);
-      final scaffold = ScaffoldMessenger.of(context);
       final navigator = Navigator.of(context);
       final appUser = await auth.signInWithEmail(
         email: _emailController.text.trim(),
@@ -42,20 +41,19 @@ class _LoginScreenState extends State<LoginScreen> {
       if (appUser != null) {
         navigator.pushReplacementNamed('/dashboard', arguments: appUser);
       } else {
-        scaffold.showSnackBar(
-          const SnackBar(
-            content: Text('Login failed'),
-            backgroundColor: Colors.red,
-          ),
+        FlashMessage.show(
+          context,
+          message: 'Login failed. Please check your credentials.',
+          type: FlashMessageType.error,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login error: $e'),
-            backgroundColor: Colors.red,
-          ),
+        FlashMessage.show(
+          context,
+          message:
+              'Login error: ${e.toString().replaceAll("Exception:", "").trim()}',
+          type: FlashMessageType.error,
         );
       }
     } finally {
@@ -74,20 +72,18 @@ class _LoginScreenState extends State<LoginScreen> {
           context,
         ).pushReplacementNamed('/dashboard', arguments: user);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign in failed'),
-            backgroundColor: Colors.red,
-          ),
+        FlashMessage.show(
+          context,
+          message: 'Google sign in failed',
+          type: FlashMessageType.error,
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Google sign-in error: $e'),
-          backgroundColor: Colors.red,
-        ),
+      FlashMessage.show(
+        context,
+        message: 'Google sign-in error: ${e.toString()}',
+        type: FlashMessageType.error,
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);

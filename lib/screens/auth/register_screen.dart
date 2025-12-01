@@ -131,7 +131,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Navigator.pop(context); // Close dialog
                     await auth.signOut(); // Sign out immediately
                     if (!mounted) return;
-                    Navigator.pop(context); // Go back to Login Screen
+                    // Clear stack and go to Login
+                    Navigator.of(
+                      context,
+                    ).pushNamedAndRemoveUntil('/', (route) => false);
                   },
                   child: const Text('OK'),
                 ),
@@ -147,7 +150,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               onComplete: () {
                 // Navigate back to login after animation completes
                 Navigator.of(context).pop(); // Close dialog
-                Navigator.pop(context); // Go back to Login Screen
+                // Clear stack and go to Login
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/', (route) => false);
               },
             ),
           );

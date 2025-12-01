@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
@@ -17,7 +18,23 @@ import 'services/task_service.dart'; // NEW IMPORT
 import 'models/user_model.dart'; // For type checking in routes
 import 'services/auth_service.dart';
 import 'services/firestore_task_service.dart';
+import 'services/notification_service.dart';
 import 'services/theme_service.dart';
+
+// Background handler must be a top-level function (placed after imports)
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Already initialized or other issue
+  }
+  await NotificationService.init();
+  await NotificationService.showFromRemote(message);
+}
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +42,8 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // Register background handler for Firebase Messaging
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     // Activate Firebase App Check using the debug provider during development.
     // This causes the App Check SDK to print a debug token in the device logs
     // which you can register in the Firebase Console under App Check -> Add Debug Token.
@@ -43,6 +62,64 @@ Future<void> main() async {
     // Continue anyway so UI doesn't crash; AuthService will handle gracefully
   }
 
+  // Initialize the optional local notification system; it's guarded internally by the service
+  try {
+    // Provide navigatorKey to NotificationService so it can navigate on notification taps
+    NotificationService.setNavigatorKey(appNavigatorKey);
+    await NotificationService.init();
+    await NotificationService.requestPermissions();
+    // Subscribe to foreground message events and show local notifications
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('FCM onMessage: ${message.messageId}');
+      NotificationService.showFromRemote(message);
+    });
+    // When the app is opened from a notification
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      debugPrint('FCM onMessageOpenedApp: ${message.messageId}');
+      // Optionally navigate or handle the payload here
+      // Use the navigator key + AuthService to navigate to Tasks and pass the taskId if present
+      final ctx = appNavigatorKey.currentContext;
+      if (ctx != null) {
+        final auth = Provider.of<AuthService>(ctx, listen: false);
+        final appUser = auth.appUser;
+        if (appUser != null) {
+          // If data includes taskId, pass it along
+          final taskId = message.data['taskId'];
+          appNavigatorKey.currentState?.pushNamed(
+            '/tasks',
+            arguments: {'user': appUser, if (taskId != null) 'taskId': taskId},
+          );
+        }
+      }
+    });
+    // If the application was launched by a notification (cold start), handle it here
+    try {
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
+      if (initialMessage != null) {
+        debugPrint('FCM initialMessage: ${initialMessage.messageId}');
+        final ctx = appNavigatorKey.currentContext;
+        if (ctx != null) {
+          final auth = Provider.of<AuthService>(ctx, listen: false);
+          final user = auth.appUser;
+          final taskId = initialMessage.data['taskId'];
+          if (user != null) {
+            appNavigatorKey.currentState?.pushNamed(
+              '/tasks',
+              arguments: {'user': user, if (taskId != null) 'taskId': taskId},
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error handling initial FCM message: $e');
+    }
+    final token = await FirebaseMessaging.instance.getToken();
+    debugPrint('FCM token: $token');
+  } catch (e) {
+    debugPrint('NotificationService initialization failed: $e');
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -51,17 +128,19 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => FirestoreTaskService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
       ],
-      child: const MyApp(),
+      child: MyApp(navigatorKey: appNavigatorKey),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final GlobalKey<NavigatorState> navigatorKey;
+  const MyApp({super.key, required this.navigatorKey});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'KeiTask Student Progress Tracker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -118,6 +197,12 @@ class MyApp extends StatelessWidget {
           displayColor: Colors.white,
         ),
         cardColor: const Color(0xFF393E46),
+
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFF00ADB5), // Teal color for actions
+          ),
+        ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF00ADB5),
@@ -139,8 +224,21 @@ class MyApp extends StatelessWidget {
           return DashboardScreen(user: user);
         },
         '/tasks': (context) {
-          final user = ModalRoute.of(context)?.settings.arguments as User;
-          return TasksScreen(user: user);
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is User) {
+            return TasksScreen(user: args);
+          }
+          if (args is Map && args['user'] is User) {
+            return TasksScreen(user: args['user'] as User);
+          }
+          // As a fallback, use currently signed in user from AuthService
+          final currentUser = Provider.of<AuthService>(
+            context,
+            listen: false,
+          ).appUser;
+          if (currentUser != null) return TasksScreen(user: currentUser);
+          // If no user, navigate to Login - empty placeholder
+          return const LoginScreen();
         },
         '/create-task': (context) {
           return const CreateTaskScreen();

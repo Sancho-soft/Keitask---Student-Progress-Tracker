@@ -9,6 +9,8 @@ import '../../../services/firestore_task_service.dart';
 // import 'progress_detail_screen.dart'; // Removed as not used in this screen
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/services.dart';
 
 // We add a required callback function to handle navigation inside the Dashboard
 class ProfileScreen extends StatelessWidget {
@@ -147,6 +149,38 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  const SizedBox(height: 12),
+
+                  // Debug: Show/Copy FCM token for testing
+                  TextButton.icon(
+                    onPressed: () async {
+                      try {
+                        final token = await FirebaseMessaging.instance
+                            .getToken();
+                        if (token != null) {
+                          await Clipboard.setData(ClipboardData(text: token));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('FCM token copied to clipboard'),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No FCM token available'),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to get token: $e')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.copy_outlined),
+                    label: const Text('Copy FCM Token'),
+                  ),
                   // Points & Completed summary (realtime)
                   StreamBuilder<List<Task>>(
                     stream: Provider.of<FirestoreTaskService>(
@@ -519,6 +553,7 @@ class ProfileScreen extends StatelessWidget {
                   TextField(
                     controller: phoneController,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       label: const Text('Phone Number'),
                       hintText: 'Enter your phone number',
@@ -643,9 +678,7 @@ class ProfileScreen extends StatelessWidget {
     bool isLoading = false;
     bool obscureNew = true;
     bool obscureConfirm = true;
-    final firestore = Provider.of<FirestoreTaskService>(context, listen: false);
     final auth = Provider.of<AuthService>(context, listen: false);
-    final dialogUser = auth.appUser ?? user;
 
     showDialog(
       context: context,
@@ -656,6 +689,7 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const SizedBox(height: 8),
                 TextField(
                   controller: newPasswordController,
                   obscureText: obscureNew,
@@ -673,110 +707,9 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Points and Completed Tasks summary
-                StreamBuilder<List<Task>>(
-                  stream: firestore.tasksStream(),
-                  builder: (context, snapshot) {
-                    final tasks = snapshot.data ?? [];
-                    final completedCount = tasks
-                        .where(
-                          (t) =>
-                              t.assignees.contains(dialogUser.id) &&
-                              t.status.toLowerCase() == 'completed',
-                        )
-                        .length;
-                    return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(230),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.emoji_events,
-                                color: Colors.orange,
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${dialogUser.points} pts',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'Points',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(230),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                              ),
-                              const SizedBox(width: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '$completedCount',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'Completed',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
+
+                // Points and Completed Tasks summary (Removed as it's irrelevant for password change and caused clutter)
                 TextField(
                   controller: confirmPasswordController,
                   obscureText: obscureConfirm,
@@ -886,7 +819,9 @@ class ProfileScreen extends StatelessWidget {
 
   // Helper: Show notifications settings dialog
   void _showNotificationSettingsDialog(BuildContext context) {
-    bool enableNotifications = true;
+    final auth = Provider.of<AuthService>(context, listen: false);
+    // Use the current user state from the provider to ensure it's up to date
+    bool enableNotifications = auth.appUser?.notificationsEnabled ?? true;
 
     showDialog(
       context: context,
@@ -898,27 +833,27 @@ class ProfileScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SwitchListTile(
-                  title: const Text('Task Notifications'),
-                  subtitle: const Text('Get notified about task updates'),
+                  title: const Text('Push Notifications'),
+                  subtitle: const Text(
+                    'Enable or disable all push notifications',
+                  ),
                   value: enableNotifications,
-                  onChanged: (value) =>
-                      setState(() => enableNotifications = value),
+                  onChanged: (value) async {
+                    setState(() => enableNotifications = value);
+                    try {
+                      await auth.updateNotificationPreference(value);
+                    } catch (e) {
+                      // Handle error silently or show toast if needed
+                    }
+                  },
                 ),
                 const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Message Alerts'),
-                  subtitle: const Text('Receive message notifications'),
-                  value: enableNotifications,
-                  onChanged: (value) =>
-                      setState(() => enableNotifications = value),
-                ),
-                const SizedBox(height: 16),
+                // Placeholder for future settings
                 SwitchListTile(
                   title: const Text('Email Digest'),
-                  subtitle: const Text('Weekly email summary'),
-                  value: enableNotifications,
-                  onChanged: (value) =>
-                      setState(() => enableNotifications = value),
+                  subtitle: const Text('Weekly email summary (Coming Soon)'),
+                  value: false,
+                  onChanged: null, // Disabled
                 ),
               ],
             ),
@@ -926,19 +861,7 @@ class ProfileScreen extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Notification settings saved!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              child: const Text('Save'),
+              child: const Text('Close'),
             ),
           ],
         ),

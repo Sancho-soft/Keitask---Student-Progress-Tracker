@@ -22,6 +22,8 @@ class _TasksScreenState extends State<TasksScreen> {
   DateTime _currentDisplayedDate = DateTime.now(); // For the header
   bool _showAllTasks = false;
   late ScrollController _dateScrollController;
+  // If the screen was opened with a taskId, we store it here to focus once data loads
+  String? _pendingTaskId;
 
   // Cache for user objects to display avatars
   final Map<String, User> _userCache = {};
@@ -226,7 +228,13 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     final args = ModalRoute.of(context)?.settings.arguments;
-    final routeUser = (args is User) ? args : null;
+    User? routeUser;
+    if (args is User) {
+      routeUser = args;
+    } else if (args is Map) {
+      if (args['user'] is User) routeUser = args['user'] as User;
+      if (args['taskId'] != null) _pendingTaskId = args['taskId'].toString();
+    }
     final effectiveUser = widget.user ?? routeUser;
     final firestore = Provider.of<FirestoreTaskService>(context);
 
@@ -506,6 +514,25 @@ class _TasksScreenState extends State<TasksScreen> {
                   );
                 }
 
+                // If an initial taskId is provided, attempt to focus the related task
+                if (_pendingTaskId != null) {
+                  final matching = allTasks
+                      .where((t) => t.id == _pendingTaskId)
+                      .toList();
+                  if (matching.isNotEmpty) {
+                    final found = matching.first;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      // Show action sheet for the task
+                      _showTaskActionsSheet(
+                        context,
+                        found,
+                        Provider.of<TaskService>(context, listen: false),
+                      );
+                    });
+                  }
+                  _pendingTaskId = null;
+                }
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: userTasks.length,
@@ -631,6 +658,21 @@ class _TasksScreenState extends State<TasksScreen> {
                             ),
                         ],
                       ),
+                      // Creator Name
+                      // Creator Name
+                      if ((task.creator?.isNotEmpty ?? false) &&
+                          _userCache.containsKey(task.creator))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, bottom: 4),
+                          child: Text(
+                            'Assigned by: ${_userCache[task.creator]?.name ?? "Unknown"}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
 
                       // Status Badge & Deadline

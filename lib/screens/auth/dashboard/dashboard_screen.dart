@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../../services/notification_service.dart';
 import 'package:provider/provider.dart';
+import '../../../services/auth_service.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../../models/user_model.dart';
 import '../../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
@@ -27,10 +28,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
   late final PageController _pageController;
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-  bool _notificationsSupported =
-      false; // Track if plugin should be used on this platform
+  // Use NotificationService for cross-platform safety
 
   // Track known task IDs to detect new ones
   Set<String> _knownTaskIds = {};
@@ -40,32 +38,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _currentIndex);
-    // Only try to init the plugin when the platform appears to support it.
-    _notificationsSupported = !_isWebAndUnsupported();
-    if (_notificationsSupported) {
-      _initNotifications();
-    }
+    // No-op here; NotificationService should be initialized from main.dart. If it wasn't,
+    // NotificationService.init() ran at startup and it's safe to call showTaskNotification.
     _listenForNewTasks();
   }
 
-  Future<void> _initNotifications() async {
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
-    const iosSettings = DarwinInitializationSettings();
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-    try {
-      await _notificationsPlugin.initialize(settings);
-    } catch (e) {
-      // If plugin is not registered on this platform (e.g., web or missing
-      // registration), avoid crashing the app and disable notifications.
-      debugPrint('Failed to initialize local notifications: $e');
-      _notificationsSupported = false;
-    }
-  }
+  // Initialization for NotificationService occurs in main.dart (or can be handled lazily in the service itself)
 
   void _listenForNewTasks() {
     final firestore = Provider.of<FirestoreTaskService>(context, listen: false);
@@ -83,53 +61,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
 
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userPrefs = authService.appUser?.notificationsEnabled ?? true;
       for (var task in myTasks) {
         if (!_knownTaskIds.contains(task.id)) {
           _knownTaskIds.add(task.id);
-          _showNotification(task);
+          if (userPrefs) NotificationService.showTaskNotification(task);
         }
       }
     });
+
+    // Listen for admin notifications
+    FirebaseFirestore.instance
+        .collection('notifications')
+        .where('recipientId', isEqualTo: widget.user.id)
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted) return;
+          for (var change in snapshot.docChanges) {
+            if (change.type == DocumentChangeType.added) {
+              final data = change.doc.data();
+              if (data != null) {
+                final title = data['title'] as String? ?? 'New Notification';
+                final body = data['body'] as String? ?? '';
+
+                // Mark as read immediately to avoid re-showing
+                change.doc.reference.update({'read': true});
+
+                // Show local notification
+                NotificationService.showGeneralNotification(
+                  id: change.doc.hashCode,
+                  title: title,
+                  body: body,
+                );
+              }
+            }
+          }
+        });
   }
 
-  Future<void> _showNotification(Task task) async {
-    if (!_notificationsSupported) return;
-    const androidDetails = AndroidNotificationDetails(
-      'task_channel',
-      'Task Assignments',
-      channelDescription: 'Notifications for new task assignments',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _notificationsPlugin.show(
-      task.hashCode,
-      'New Task Assigned',
-      'You have been assigned: ${task.title}',
-      details,
-    );
-  }
+  // Removed the local plugin wrapper in favor of NotificationService
 
   // Helper to detect unsupported scenarios (e.g., web builds)
-  bool _isWebAndUnsupported() {
-    if (kIsWeb) return true;
-    // defaultTargetPlatform will return a platform enum for a given build target
-    // so we can detect desktop / mobile. The plugin supports Android/iOS, and
-    // some versions support desktop. We'll conservatively assume desktop support
-    // may vary and still check for Android/iOS primarily.
-    final platform = defaultTargetPlatform;
-    if (platform == TargetPlatform.android || platform == TargetPlatform.iOS) {
-      return false;
-    }
-    // For desktop (macOS/windows/linux), allow but wrap in try/catch since
-    // plugin availability could vary.
-    return false;
-  }
+  // NotificationService handles platform compatibility internally.
 
   @override
   void dispose() {
@@ -225,6 +200,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Scaffold(
+      // Add a debug FAB for quick notification testing in debug mode
+      floatingActionButton: kDebugMode
+          ? FloatingActionButton(
+              onPressed: () {
+                final demoTask = Task(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  title: 'Demo Task',
+                  description: 'This is a demo task notification',
+                  status: 'approved',
+                  assignees: [widget.user.id],
+                  dueDate: DateTime.now().add(const Duration(days: 1)),
+                );
+                NotificationService.showTaskNotification(demoTask);
+              },
+              child: const Icon(Icons.notifications),
+            )
+          : null,
       extendBody: false,
       body: PageView(
         controller: _pageController,

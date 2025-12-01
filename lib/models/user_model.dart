@@ -22,12 +22,14 @@ class User {
     this.teachingCourseIds,
     this.phoneNumber,
     this.isBanned = false,
+    this.notificationsEnabled,
   });
 
   final List<String>? enrolledCourseIds; // For students
   final List<String>? teachingCourseIds; // For professors
   final String? phoneNumber;
   final bool isBanned;
+  final bool? notificationsEnabled;
 
   String get rank {
     if (points >= 5000) return 'Diamond';
@@ -57,6 +59,7 @@ class User {
           : null,
       phoneNumber: json['phoneNumber'],
       isBanned: json['isBanned'] ?? false,
+      notificationsEnabled: json['notificationsEnabled'] ?? true,
     );
   }
 
@@ -73,6 +76,7 @@ class User {
       'teachingCourseIds': teachingCourseIds,
       'phoneNumber': phoneNumber,
       'isBanned': isBanned,
+      'notificationsEnabled': notificationsEnabled,
     };
   }
 }

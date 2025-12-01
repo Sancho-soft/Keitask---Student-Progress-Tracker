@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -32,6 +33,15 @@ class AuthService extends ChangeNotifier {
           firebaseUser = fbUser;
           if (fbUser != null) {
             await _loadAppUser(fbUser.uid);
+            // Save the FCM token for the current user so we can target them with push notifications
+            try {
+              final fcmToken = await FirebaseMessaging.instance.getToken();
+              if (fcmToken != null) {
+                await _firestore.collection('users').doc(fbUser.uid).update({
+                  'fcmToken': fcmToken,
+                });
+              }
+            } catch (_) {}
           } else {
             appUser = null;
           }
@@ -42,6 +52,17 @@ class AuthService extends ChangeNotifier {
           notifyListeners();
         },
       );
+      // Listen for token refreshes and persist for the user if signed in
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+        try {
+          final uid = firebaseUser?.uid;
+          if (uid != null && token != null) {
+            await _firestore.collection('users').doc(uid).update({
+              'fcmToken': token,
+            });
+          }
+        } catch (_) {}
+      });
     } catch (e) {
       _initError = 'AuthService init failed: $e';
       notifyListeners();
@@ -399,6 +420,34 @@ class AuthService extends ChangeNotifier {
     if (firebaseUser != null) {
       await _loadAppUser(firebaseUser!.uid);
       notifyListeners();
+    }
+  }
+
+  Future<void> updateNotificationPreference(bool enabled) async {
+    try {
+      if (firebaseUser == null) return;
+      await _firestore.collection('users').doc(firebaseUser!.uid).update({
+        'notificationsEnabled': enabled,
+      });
+      if (appUser != null) {
+        appUser = app_models.User(
+          id: appUser!.id,
+          email: appUser!.email,
+          name: appUser!.name,
+          role: appUser!.role,
+          profileImage: appUser!.profileImage,
+          points: appUser!.points,
+          isApproved: appUser!.isApproved,
+          enrolledCourseIds: appUser!.enrolledCourseIds,
+          teachingCourseIds: appUser!.teachingCourseIds,
+          phoneNumber: appUser!.phoneNumber,
+          isBanned: appUser!.isBanned,
+          notificationsEnabled: enabled,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 
