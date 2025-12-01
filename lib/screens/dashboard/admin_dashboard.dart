@@ -2,11 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/user_model.dart';
-import '../../../services/task_service.dart';
-import '../../../services/firestore_task_service.dart';
-import '../../../services/auth_service.dart';
-import '../../admin/task_statistics_screen.dart';
+import '../../models/user_model.dart';
+import '../../services/task_service.dart';
+import '../../services/firestore_task_service.dart';
+import '../../services/auth_service.dart';
+import '../admin/task_statistics_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   final User user;

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../services/task_service.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/firestore_task_service.dart';
-import '../../../models/user_model.dart';
+import '../../services/task_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_task_service.dart';
+import '../../models/user_model.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 

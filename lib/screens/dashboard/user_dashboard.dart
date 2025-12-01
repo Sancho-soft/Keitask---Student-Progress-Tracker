@@ -2,9 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/user_model.dart';
-import '../../../services/firestore_task_service.dart';
-import '../../../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import '../../models/user_model.dart';
+import '../../services/firestore_task_service.dart';
+import '../../services/auth_service.dart';
 import '../profile/progress_detail_screen.dart';
 
 class UserDashboard extends StatefulWidget {
@@ -147,17 +149,73 @@ class _UserDashboardState extends State<UserDashboard> {
                           ),
                         ],
                       ),
-                      // Notification Icon (Matching Figma)
-                      IconButton(
-                        icon: const Icon(Icons.notifications_none, size: 24),
-                        color: Colors.grey[600],
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'No new notifications (Feature not yet implemented)',
+                      // Notification Icon with Badge
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('notifications')
+                            .where('recipientId', isEqualTo: widget.user.id)
+                            .orderBy('createdAt', descending: true)
+                            .limit(50)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return IconButton(
+                              icon: const Icon(
+                                Icons.notifications_off,
+                                size: 28,
                               ),
-                            ),
+                              color: Colors.grey,
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: ${snapshot.error}'),
+                                  ),
+                                );
+                              },
+                            );
+                          }
+
+                          final notifications = snapshot.data?.docs ?? [];
+                          final unreadCount = notifications
+                              .where(
+                                (doc) =>
+                                    !(doc.data()
+                                        as Map<String, dynamic>)['read'],
+                              )
+                              .length;
+
+                          return Stack(
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.notifications_none,
+                                  size: 28,
+                                ),
+                                color: Colors.grey[800],
+                                onPressed: () {
+                                  _showNotificationsSheet(
+                                    context,
+                                    notifications,
+                                  );
+                                },
+                              ),
+                              if (unreadCount > 0)
+                                Positioned(
+                                  right: 12,
+                                  top: 12,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 8,
+                                      minHeight: 8,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           );
                         },
                       ),
@@ -173,7 +231,7 @@ class _UserDashboardState extends State<UserDashboard> {
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
                     childAspectRatio:
-                        1.5, // Adjusted from 1.6 to 1.5 to provide more vertical space
+                        1.25, // Adjusted to 1.25 to prevent overflow
                     children: [
                       _buildStatCard(
                         'Approved',
@@ -309,16 +367,16 @@ class _UserDashboardState extends State<UserDashboard> {
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.grey.withAlpha((0.1 * 255).round()),
-                          spreadRadius: 1,
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                          color: Colors.grey.withAlpha(30),
+                          spreadRadius: 2,
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
@@ -363,15 +421,17 @@ class _UserDashboardState extends State<UserDashboard> {
                         ),
                         const SizedBox(height: 12),
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: totalTasks > 0
-                                ? completedCount / totalTasks
-                                : 0,
-                            minHeight: 8,
-                            backgroundColor: Colors.grey[200],
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Colors.blue,
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            height: 12,
+                            child: LinearProgressIndicator(
+                              value: totalTasks > 0
+                                  ? completedCount / totalTasks
+                                  : 0,
+                              backgroundColor: Colors.grey[100],
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Colors.blue,
+                              ),
                             ),
                           ),
                         ),
@@ -494,18 +554,18 @@ class _UserDashboardState extends State<UserDashboard> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withAlpha((0.1 * 255).round()),
+                color: Colors.grey.withAlpha(20),
                 spreadRadius: 1,
-                blurRadius: 4,
+                blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               Container(
@@ -585,55 +645,180 @@ class _UserDashboardState extends State<UserDashboard> {
     Color color,
     IconData icon,
   ) {
-    // This widget is optimized for the 1.5 aspect ratio.
+    // Premium Stat Card with Gradient and Shadow
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: backgroundColor,
-        border: Border.all(
-          color: color.withAlpha((0.2 * 255).round()),
-          width: 1,
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            backgroundColor,
+            backgroundColor.withAlpha(200), // Slightly lighter/different shade
+          ],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha(50),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: color.withAlpha((0.2 * 255).round()),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withAlpha(30),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 count,
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: Colors.black87,
                 ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  void _showNotificationsSheet(
+    BuildContext context,
+    List<QueryDocumentSnapshot> notifications,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // Mark all as read
+                      final batch = FirebaseFirestore.instance.batch();
+                      for (var doc in notifications) {
+                        batch.update(doc.reference, {'read': true});
+                      }
+                      batch.commit();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Mark all as read'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (notifications.isEmpty)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: Text('No notifications'),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final doc = notifications[index];
+                      final data = doc.data() as Map<String, dynamic>;
+                      final isRead = data['read'] ?? false;
+                      final timestamp = data['createdAt'] as Timestamp?;
+                      final timeStr = timestamp != null
+                          ? DateFormat(
+                              'MMM d, h:mm a',
+                            ).format(timestamp.toDate())
+                          : '';
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isRead
+                              ? Colors.grey[200]
+                              : Colors.blue[100],
+                          child: Icon(
+                            Icons.notifications,
+                            color: isRead ? Colors.grey : Colors.blue,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          data['title'] ?? 'Notification',
+                          style: TextStyle(
+                            fontWeight: isRead
+                                ? FontWeight.normal
+                                : FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(data['body'] ?? ''),
+                            if (timeStr.isNotEmpty)
+                              Text(
+                                timeStr,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
+                        onTap: () {
+                          // Mark as read
+                          doc.reference.update({'read': true});
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 

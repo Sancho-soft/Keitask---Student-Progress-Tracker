@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../auth/tasks/create_task_screen.dart';
+import '../tasks/create_task_screen.dart';
 import '../../widgets/flash_message.dart';
 
 class UsersScreen extends StatefulWidget {
@@ -330,7 +330,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                     user.id,
                                     value,
                                   );
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -345,13 +345,13 @@ class _UsersScreenState extends State<UsersScreen> {
                                     ),
                                   );
                                 } catch (e) {
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(content: Text('Error: $e')),
                                   );
                                 }
                               },
-                              activeColor: Colors.green,
+                              activeThumbColor: Colors.green,
                             )
                           : (_isSelectionMode
                                 ? Checkbox(
@@ -416,7 +416,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                         user.id,
                                         !user.isBanned,
                                       );
-                                      if (!mounted) return;
+                                      if (!context.mounted) return;
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
@@ -429,7 +429,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                         ),
                                       );
                                     } catch (e) {
-                                      if (!mounted) return;
+                                      if (!context.mounted) return;
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(
@@ -502,6 +502,7 @@ class _UsersScreenState extends State<UsersScreen> {
                                 if (ok != true) return;
                                 final title = titleController.text.trim();
                                 final body = bodyController.text.trim();
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Sending notification...'),

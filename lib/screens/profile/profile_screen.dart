@@ -1,15 +1,15 @@
 // lib/screens/auth/profile/profile_screen.dart (IMPLEMENTED EDIT PROFILE, CHANGE PASSWORD, SYSTEM PREFERENCES)
 
 import 'package:flutter/material.dart';
-import '../../../models/user_model.dart';
+import '../../models/user_model.dart';
 import 'package:provider/provider.dart';
-import '../../../services/auth_service.dart';
-import '../../../services/theme_service.dart';
-import '../../../services/firestore_task_service.dart';
+import '../../services/auth_service.dart';
+import '../../services/theme_service.dart';
+import '../../services/firestore_task_service.dart';
 // import 'progress_detail_screen.dart'; // Removed as not used in this screen
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:firebase_messaging/firebase_messaging.dart';
+
 import 'package:flutter/services.dart';
 
 // We add a required callback function to handle navigation inside the Dashboard
@@ -152,35 +152,6 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Debug: Show/Copy FCM token for testing
-                  TextButton.icon(
-                    onPressed: () async {
-                      try {
-                        final token = await FirebaseMessaging.instance
-                            .getToken();
-                        if (token != null) {
-                          await Clipboard.setData(ClipboardData(text: token));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('FCM token copied to clipboard'),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('No FCM token available'),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to get token: $e')),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.copy_outlined),
-                    label: const Text('Copy FCM Token'),
-                  ),
                   // Points & Completed summary (realtime)
                   StreamBuilder<List<Task>>(
                     stream: Provider.of<FirestoreTaskService>(
@@ -678,7 +649,6 @@ class ProfileScreen extends StatelessWidget {
     bool isLoading = false;
     bool obscureNew = true;
     bool obscureConfirm = true;
-    final auth = Provider.of<AuthService>(context, listen: false);
 
     showDialog(
       context: context,

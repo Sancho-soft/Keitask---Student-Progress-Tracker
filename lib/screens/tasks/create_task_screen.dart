@@ -84,10 +84,12 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     app_models.User? user = widget.user;
     bool adminCreate = widget.adminCreate;
     if (args is Map) {
-      if (args['user'] is app_models.User)
+      if (args['user'] is app_models.User) {
         user = args['user'] as app_models.User;
-      if (args['adminCreate'] is bool)
+      }
+      if (args['adminCreate'] is bool) {
         adminCreate = args['adminCreate'] as bool;
+      }
     } else if (args is app_models.User) {
       user = args;
     }
@@ -122,11 +124,16 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       _selectedTime.minute,
     );
 
+    if (dueDateTime.isBefore(DateTime.now())) {
+      _showSnackBar('Due time must be in the future', Colors.red);
+      setState(() => _isCreating = false);
+      return;
+    }
+
     // Create a single Task that contains the list of selected assignees
     final assignees = adminCreate
         ? List<String>.from(_selectedAssigneeIds)
         : <String>[]; // non-admins don't assign users directly
-    // Try to resolve human-readable assignee names (optional)
     // Try to resolve human-readable assignee names (optional)
     final authService = Provider.of<AuthService>(context, listen: false);
     List<String>? assigneeNames;
@@ -148,25 +155,27 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         }).toList();
       }
     } catch (e) {
-      print('Error fetching assignee names: $e');
+      // print('Error fetching assignee names: $e');
       assigneeNames = null;
+    }
+
+    // Determine initial status
+    // Admins: 'assigned' (immediate assignment)
+    // Professors: 'pending_approval' (needs admin review)
+    // Others (if any): 'pending'
+    String initialStatus = 'pending';
+    if (widget.user?.role == 'admin') {
+      initialStatus = 'assigned';
+    } else if (widget.user?.role == 'professor') {
+      initialStatus = 'pending_approval';
     }
 
     final newTask = app_models.Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
-      status: adminCreate ? 'approved' : 'pending',
+      status: initialStatus,
       assignees: assignees,
-      requestedAssigneeNames: adminCreate
-          ? null
-          : (_requestedAssigneesController.text.trim().isNotEmpty
-                ? _requestedAssigneesController.text
-                      .split(',')
-                      .map((s) => s.trim())
-                      .where((s) => s.isNotEmpty)
-                      .toList()
-                : null),
       assigneeNames: assigneeNames,
       dueDate: dueDateTime,
       creator: creatorId,
@@ -277,7 +286,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                               _selectedAssigneeIds.clear();
                             });
                           },
-                          activeColor: Colors.white,
+                          activeThumbColor: Colors.white,
                           activeTrackColor: Colors.blue,
                         ),
                       ),

@@ -55,7 +55,6 @@ class FlashMessage {
       case FlashMessageType.warning:
         return Colors.orange.shade700;
       case FlashMessageType.info:
-      default:
         return Colors.blue.shade600;
     }
   }
@@ -69,7 +68,6 @@ class FlashMessage {
       case FlashMessageType.warning:
         return Icons.warning_amber_rounded;
       case FlashMessageType.info:
-      default:
         return Icons.info_outline;
     }
   }

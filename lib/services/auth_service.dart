@@ -25,6 +25,7 @@ class AuthService extends ChangeNotifier {
   app_models.User? appUser;
   String? _initError;
   String? get initError => _initError;
+  String? _loadingUid; // Track which UID is currently being loaded
 
   AuthService() {
     try {
@@ -32,16 +33,24 @@ class AuthService extends ChangeNotifier {
         (fbUser) async {
           firebaseUser = fbUser;
           if (fbUser != null) {
-            await _loadAppUser(fbUser.uid);
-            // Save the FCM token for the current user so we can target them with push notifications
+            // Avoid double loading if already in progress for this UID
+            if (_loadingUid == fbUser.uid) return;
+
             try {
-              final fcmToken = await FirebaseMessaging.instance.getToken();
-              if (fcmToken != null) {
-                await _firestore.collection('users').doc(fbUser.uid).update({
-                  'fcmToken': fcmToken,
-                });
-              }
-            } catch (_) {}
+              await _loadAppUser(fbUser.uid);
+              // Save the FCM token for the current user so we can target them with push notifications
+              try {
+                final fcmToken = await FirebaseMessaging.instance.getToken();
+                if (fcmToken != null) {
+                  await _firestore.collection('users').doc(fbUser.uid).update({
+                    'fcmToken': fcmToken,
+                  });
+                }
+              } catch (_) {}
+            } catch (e) {
+              debugPrint('Error loading user in auth listener: $e');
+              // If loading failed (e.g. banned), appUser might be null or we might be signed out
+            }
           } else {
             appUser = null;
           }
@@ -56,7 +65,7 @@ class AuthService extends ChangeNotifier {
       FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
         try {
           final uid = firebaseUser?.uid;
-          if (uid != null && token != null) {
+          if (uid != null) {
             await _firestore.collection('users').doc(uid).update({
               'fcmToken': token,
             });
@@ -70,21 +79,38 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _loadAppUser(String uid) async {
-    final doc = await _firestore.collection('users').doc(uid).get();
-    if (doc.exists) {
-      appUser = app_models.User.fromJson(doc.data()!);
-    } else {
-      // create a minimal record if missing
-      final u = app_models.User(
-        id: uid,
-        email: firebaseUser?.email ?? '',
-        name: firebaseUser?.displayName ?? '',
-        role: 'user',
-        points: 0,
-        isApproved: true,
-      );
-      await _firestore.collection('users').doc(uid).set(u.toJson());
-      appUser = u;
+    _loadingUid = uid;
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        appUser = app_models.User.fromJson(doc.data()!);
+      } else {
+        // create a minimal record if missing
+        final u = app_models.User(
+          id: uid,
+          email: firebaseUser?.email ?? '',
+          name: firebaseUser?.displayName ?? '',
+          role: 'user',
+          points: 0,
+          isApproved: true,
+        );
+        await _firestore.collection('users').doc(uid).set(u.toJson());
+        appUser = u;
+      }
+
+      // Check for ban or unapproved professor status
+      if (appUser != null) {
+        if (appUser!.isBanned) {
+          await signOut();
+          throw 'This account is under investigation. Please contact admin@keitask.com.';
+        }
+        if (appUser!.role == 'professor' && !appUser!.isApproved) {
+          await signOut();
+          throw 'Your professor account is pending approval. Please contact admin@keitask.com.';
+        }
+      }
+    } finally {
+      _loadingUid = null;
     }
   }
 
@@ -252,7 +278,12 @@ class AuthService extends ChangeNotifier {
       password: password,
     );
     final uid = cred.user!.uid;
-    await _loadAppUser(uid);
+    try {
+      await _loadAppUser(uid);
+    } catch (e) {
+      // If _loadAppUser throws (due to ban/approval), rethrow to UI
+      rethrow;
+    }
     notifyListeners();
     return appUser;
   }

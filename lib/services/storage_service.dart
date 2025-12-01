@@ -79,7 +79,7 @@ class StorageService {
           return data['secure_url'] as String?;
         }
       } catch (e) {
-        print('Upload failed: $e');
+        // print('Upload failed: $e');
         // fallback to null
       }
     }

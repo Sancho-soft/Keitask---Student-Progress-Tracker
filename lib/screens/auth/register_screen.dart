@@ -120,7 +120,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           await showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (context) => AlertDialog(
+            builder: (dialogContext) => AlertDialog(
               title: const Text('Registration Successful'),
               content: const Text(
                 'Your account has been created but requires Admin approval before you can log in.\n\nPlease wait for an administrator to approve your account.',
@@ -128,7 +128,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               actions: [
                 TextButton(
                   onPressed: () async {
-                    Navigator.pop(context); // Close dialog
+                    Navigator.pop(dialogContext); // Close dialog
                     await auth.signOut(); // Sign out immediately
                     if (!mounted) return;
                     // Clear stack and go to Login

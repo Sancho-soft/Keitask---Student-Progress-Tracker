@@ -58,7 +58,16 @@ class FirestoreTaskService extends ChangeNotifier {
   Future<void> approveTask(String taskId) async {
     // Approve without marking completedAt — approval is distinct from completion.
     await _tasksRef.doc(taskId).update({
-      'status': 'approved',
+      'status': 'completed',
+      'completedAt': FieldValue.serverTimestamp(),
+      'rejectionReason': null,
+    });
+    notifyListeners();
+  }
+
+  Future<void> approveProfessorTask(String taskId) async {
+    await _tasksRef.doc(taskId).update({
+      'status': 'assigned',
       'rejectionReason': null,
     });
     notifyListeners();
@@ -163,21 +172,11 @@ class FirestoreTaskService extends ChangeNotifier {
     currentCompletionStatus[userId] = DateTime.now().toIso8601String();
 
     // Check if all assignees have completed
-    final assignees = List<String>.from(taskData['assignees'] ?? []);
-    bool allCompleted = true;
-    for (final assignee in assignees) {
-      if (assignee == userId) continue;
-      if (!currentCompletionStatus.containsKey(assignee)) {
-        allCompleted = false;
-        break;
-      }
-    }
 
     await taskRef.update({
       'submissions': currentSubmissions,
       'completionStatus': currentCompletionStatus,
-      if (allCompleted) 'status': 'completed',
-      if (allCompleted) 'completedAt': FieldValue.serverTimestamp(),
+      'status': 'pending', // Always set to pending for review
     });
     notifyListeners();
   }

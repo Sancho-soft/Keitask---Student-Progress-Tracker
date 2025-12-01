@@ -9,10 +9,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/auth/dashboard/dashboard_screen.dart'; // Ensure this path is correct
+import 'screens/dashboard/dashboard_screen.dart'; // Ensure this path is correct
 import 'screens/auth/register_screen.dart'; // Ensure this path is correct
-import 'screens/auth/tasks/create_task_screen.dart';
-import 'screens/auth/tasks/tasks_screen.dart';
+import 'screens/tasks/create_task_screen.dart';
+import 'screens/tasks/tasks_screen.dart';
 import 'screens/admin/users_screen.dart';
 import 'services/task_service.dart'; // NEW IMPORT
 import 'models/user_model.dart'; // For type checking in routes
@@ -79,7 +79,7 @@ Future<void> main() async {
       // Optionally navigate or handle the payload here
       // Use the navigator key + AuthService to navigate to Tasks and pass the taskId if present
       final ctx = appNavigatorKey.currentContext;
-      if (ctx != null) {
+      if (ctx != null && ctx.mounted) {
         final auth = Provider.of<AuthService>(ctx, listen: false);
         final appUser = auth.appUser;
         if (appUser != null) {
@@ -99,7 +99,7 @@ Future<void> main() async {
       if (initialMessage != null) {
         debugPrint('FCM initialMessage: ${initialMessage.messageId}');
         final ctx = appNavigatorKey.currentContext;
-        if (ctx != null) {
+        if (ctx != null && ctx.mounted) {
           final auth = Provider.of<AuthService>(ctx, listen: false);
           final user = auth.appUser;
           final taskId = initialMessage.data['taskId'];

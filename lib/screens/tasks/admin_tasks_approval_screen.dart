@@ -1,9 +1,9 @@
 // lib/screens/auth/tasks/admin_tasks_approval_screen.dart (FIREBASE INTEGRATION)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/user_model.dart';
-import '../../../services/task_service.dart';
-import '../../../services/firestore_task_service.dart';
+import '../../models/user_model.dart';
+import '../../services/task_service.dart';
+import '../../services/firestore_task_service.dart';
 
 class AdminTasksApprovalScreen extends StatefulWidget {
   final User user;
@@ -114,7 +114,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
             ),
           ),
 
-          // Filter Chips (Matching Figma: All/Pending)
+          // Filter Chips (Matching Figma: All/Pending/Approvals)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
@@ -130,8 +130,16 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                 GestureDetector(
                   onTap: () => setState(() => _filterStatus = 'pending'),
                   child: _buildFilterChip(
-                    'Pending',
+                    'Submissions',
                     isSelected: _filterStatus == 'pending',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _filterStatus = 'approvals'),
+                  child: _buildFilterChip(
+                    'Approvals',
+                    isSelected: _filterStatus == 'approvals',
                   ),
                 ),
               ],
@@ -150,23 +158,32 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
 
                 final allTasks = snapshot.data ?? [];
 
-                // Apply filter: pending should include 'pending' and 'resubmitted'
-                final filteredTasks = _filterStatus == 'pending'
-                    ? allTasks
-                          .where(
-                            (t) =>
-                                t.status.toLowerCase() == 'pending' ||
-                                t.status.toLowerCase() == 'resubmitted',
-                          )
-                          .toList()
-                    : allTasks;
+                // Apply filter
+                List<Task> filteredTasks = allTasks;
+                if (_filterStatus == 'pending') {
+                  filteredTasks = allTasks
+                      .where(
+                        (t) =>
+                            t.status.toLowerCase() == 'pending' ||
+                            t.status.toLowerCase() == 'resubmitted',
+                      )
+                      .toList();
+                } else if (_filterStatus == 'approvals') {
+                  filteredTasks = allTasks
+                      .where(
+                        (t) => t.status.toLowerCase() == 'pending_approval',
+                      )
+                      .toList();
+                }
 
                 if (filteredTasks.isEmpty) {
                   return Center(
                     child: Text(
                       _filterStatus == 'pending'
-                          ? 'No pending tasks.'
-                          : 'No tasks created yet.',
+                          ? 'No pending submissions.'
+                          : (_filterStatus == 'approvals'
+                                ? 'No pending approvals.'
+                                : 'No tasks found.'),
                     ),
                   );
                 }
@@ -220,12 +237,19 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
   ) {
     // Determine the status color and chips (case-insensitive)
     final statusLc = task.status.toLowerCase();
-    final isPending = statusLc == 'pending' || statusLc == 'resubmitted';
+    final isPendingSubmission =
+        statusLc == 'pending' || statusLc == 'resubmitted';
+    final isPendingApproval = statusLc == 'pending_approval';
     final isRejected = statusLc == 'rejected';
-    final Color statusColor = isPending
+
+    final Color statusColor = (isPendingSubmission || isPendingApproval)
         ? Colors.orange
-        : (statusLc == 'approved' ? Colors.green : Colors.red);
-    final String statusText = task.status.toUpperCase();
+        : (statusLc == 'approved' || statusLc == 'assigned'
+              ? Colors.green
+              : Colors.red);
+
+    String statusText = task.status.toUpperCase();
+    if (isPendingApproval) statusText = 'NEEDS APPROVAL';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -246,7 +270,9 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              assigneeName,
+              assigneeName.isNotEmpty
+                  ? assigneeName
+                  : 'Created by ${task.creator}',
               style: const TextStyle(fontSize: 13, color: Colors.black54),
             ),
 
@@ -319,79 +345,91 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                       ),
                     ),
                   ),
-                ] else if (isPending)
-                  // Approve and Reject Buttons (Only visible if pending)
-                  Row(
-                    children: [
-                      // Approve Button
-                      SizedBox(
-                        height: 28,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            // Guard: only allow approve when task is pending or resubmitted
-                            final current = task.status.toLowerCase();
-                            if (current != 'pending' &&
-                                current != 'resubmitted') {
-                              _showFeedback(
+                ] else if (isPendingSubmission || isPendingApproval)
+                  // Approve and Reject Buttons
+                  // Only show if Admin OR (if it's a submission and user is professor)
+                  // But for 'pending_approval' (Task Approval), ONLY Admin can approve.
+                  if (widget.user.role == 'admin' ||
+                      (!isPendingApproval && widget.user.role == 'professor'))
+                    Row(
+                      children: [
+                        // Approve Button
+                        SizedBox(
+                          height: 28,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              if (isPendingApproval) {
+                                await firestoreTaskService.approveProfessorTask(
+                                  task.id,
+                                );
+                                if (!context.mounted) return;
+                                _showFeedback(
+                                  context,
+                                  'Task Approved (Assigned).',
+                                );
+                              } else {
+                                await firestoreTaskService.approveTask(task.id);
+                                if (!context.mounted) return;
+                                _showFeedback(
+                                  context,
+                                  'Task Approved (Completed).',
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Approve',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Reject Button
+                        SizedBox(
+                          height: 28,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              _showRejectDialog(
                                 context,
-                                'Cannot approve task in its current state.',
+                                task.id,
+                                firestoreTaskService,
                               );
-                              return;
-                            }
-                            await firestoreTaskService.approveTask(task.id);
-                            if (!context.mounted) return;
-                            _showFeedback(context, 'Task Approved.');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Approve',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                            child: const Text(
+                              'Reject',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Reject Button
-                      SizedBox(
-                        height: 28,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            _showRejectDialog(
-                              context,
-                              task.id,
-                              firestoreTaskService,
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Reject',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
               ],
             ),
           ],

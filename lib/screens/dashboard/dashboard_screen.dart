@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../services/notification_service.dart';
+import '../../services/notification_service.dart';
 import 'package:provider/provider.dart';
-import '../../../services/auth_service.dart';
+import '../../services/auth_service.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
-import '../../../models/user_model.dart';
-import '../../../services/firestore_task_service.dart';
+import '../../models/user_model.dart';
+import '../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
 import '../tasks/tasks_screen.dart';
 import '../profile/profile_screen.dart';
@@ -13,8 +13,8 @@ import '../leaderboard/leaderboard_screen.dart';
 import 'admin_dashboard.dart';
 import 'user_dashboard.dart';
 import '../tasks/admin_tasks_approval_screen.dart';
-import '../../admin/users_screen.dart';
-import '../../admin/task_statistics_screen.dart';
+import '../admin/users_screen.dart';
+import '../admin/task_statistics_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final User user;
@@ -163,7 +163,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else if (isProfessor) {
       screens = [
         UserDashboard(user: widget.user),
-        TasksScreen(user: widget.user, showBackButton: false),
+        AdminTasksApprovalScreen(
+          user: widget.user,
+        ), // Professors use this to approve/reject
         const SizedBox(), // Placeholder for "New Task" (handled in _onTabSelected)
         const TaskStatisticsScreen(showBackButton: false),
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),

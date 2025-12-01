@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/user_model.dart';
-import '../../../services/task_service.dart';
-import '../../../services/firestore_task_service.dart';
-import '../../../services/auth_service.dart';
+import '../../models/user_model.dart';
+import '../../services/task_service.dart';
+import '../../services/firestore_task_service.dart';
+import '../../services/auth_service.dart';
 import 'edit_task_screen.dart';
 import 'task_submission_screen.dart';
 
@@ -28,25 +28,32 @@ class _TasksScreenState extends State<TasksScreen> {
   // Cache for user objects to display avatars
   final Map<String, User> _userCache = {};
 
+  bool _isControllerInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    _dateScrollController = ScrollController(
-      initialScrollOffset:
-          (365 * 60.0) - // Adjusted item width estimate
-          (MediaQueryData.fromView(WidgetsBinding.instance.window).size.width /
-              2) +
-          30,
-    );
-    _dateScrollController.addListener(_onScroll);
     _fetchUsers();
+  }
 
-    // Center on today after build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_dateScrollController.hasClients) {
-        _scrollToDate(DateTime.now());
-      }
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isControllerInitialized) {
+      _dateScrollController = ScrollController(
+        initialScrollOffset:
+            (365 * 60.0) - (MediaQuery.of(context).size.width / 2) + 30,
+      );
+      _dateScrollController.addListener(_onScroll);
+
+      // Center on today after build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_dateScrollController.hasClients) {
+          _scrollToDate(DateTime.now());
+        }
+      });
+      _isControllerInitialized = true;
+    }
   }
 
   @override
@@ -101,7 +108,7 @@ class _TasksScreenState extends State<TasksScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching users for avatars: $e');
+      // print('Error fetching users for avatars: $e');
     }
   }
 
@@ -109,6 +116,7 @@ class _TasksScreenState extends State<TasksScreen> {
     BuildContext context,
     Task task,
     TaskService taskService,
+    User? effectiveUser,
   ) {
     showModalBottomSheet(
       context: context,
@@ -137,40 +145,39 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ),
               const Divider(height: 1),
-              Builder(
-                builder: (context) {
-                  if (statusLower == 'rejected') {
-                    return ListTile(
-                      leading: const Icon(
-                        Icons.report_problem,
-                        color: Colors.orange,
-                      ),
-                      title: const Text('View Rejection Reason'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        showDialog<void>(
-                          context: context,
-                          builder: (ctx) {
-                            return AlertDialog(
-                              title: const Text('Rejection Reason'),
-                              content: Text(
-                                task.rejectionReason ?? 'No reason provided.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.of(ctx).pop(),
-                                  child: const Text('Close'),
-                                ),
-                              ],
-                            );
-                          },
+              if (statusLower == 'rejected')
+                ListTile(
+                  leading: const Icon(
+                    Icons.report_problem,
+                    color: Colors.orange,
+                  ),
+                  title: const Text('View Rejection Reason'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    showDialog<void>(
+                      context: context,
+                      builder: (ctx) {
+                        return AlertDialog(
+                          title: const Text('Rejection Reason'),
+                          content: Text(
+                            task.rejectionReason ?? 'No reason provided.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('Close'),
+                            ),
+                          ],
                         );
                       },
                     );
-                  }
-
-                  // Default action: Submit Task
-                  return ListTile(
+                  },
+                )
+              else ...[
+                // Action: Submit Task (Students only)
+                if (effectiveUser?.role != 'admin' &&
+                    effectiveUser?.role != 'professor')
+                  ListTile(
                     leading: const Icon(Icons.upload_file, color: Colors.blue),
                     title: const Text('Submit Task'),
                     onTap: () {
@@ -185,39 +192,48 @@ class _TasksScreenState extends State<TasksScreen> {
                         ),
                       );
                     },
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.edit, color: Colors.blue),
-                title: const Text('Edit Task'),
-                enabled:
-                    !(statusLower == 'approved' || statusLower == 'completed'),
-                onTap: (statusLower == 'approved' || statusLower == 'completed')
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditTaskScreen(task: task),
-                          ),
-                        );
-                      },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Delete Task'),
-                onTap: () async {
-                  final nav = Navigator.of(context);
-                  final messenger = ScaffoldMessenger.of(context);
-                  await firestore.deleteTask(task.id);
-                  nav.pop();
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Task deleted.')),
-                  );
-                },
-              ),
+                  ),
+
+                ListTile(
+                  leading: const Icon(Icons.edit, color: Colors.blue),
+                  title: const Text('Edit Task'),
+                  enabled:
+                      !(statusLower == 'approved' ||
+                          statusLower == 'completed'),
+                  onTap:
+                      (statusLower == 'approved' || statusLower == 'completed')
+                      ? null
+                      : () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditTaskScreen(task: task),
+                            ),
+                          );
+                        },
+                ),
+
+                // Action: Delete Task (Admins/Professors only)
+                if (effectiveUser?.role == 'admin' ||
+                    effectiveUser?.role == 'professor')
+                  ListTile(
+                    leading: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
+                    ),
+                    title: const Text('Delete Task'),
+                    onTap: () async {
+                      final nav = Navigator.of(context);
+                      final messenger = ScaffoldMessenger.of(context);
+                      await firestore.deleteTask(task.id);
+                      nav.pop();
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Task deleted.')),
+                      );
+                    },
+                  ),
+              ],
             ],
           ),
         );
@@ -527,6 +543,7 @@ class _TasksScreenState extends State<TasksScreen> {
                         context,
                         found,
                         Provider.of<TaskService>(context, listen: false),
+                        effectiveUser,
                       );
                     });
                   }
@@ -600,7 +617,8 @@ class _TasksScreenState extends State<TasksScreen> {
         (task.bookmarkedBy?.contains(effectiveUser.id) ?? false);
 
     return GestureDetector(
-      onTap: () => _showTaskActionsSheet(context, task, taskService),
+      onTap: () =>
+          _showTaskActionsSheet(context, task, taskService, effectiveUser),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
