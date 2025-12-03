@@ -22,8 +22,15 @@ class TaskSubmissionScreen extends StatefulWidget {
 
 class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
   final List<PlatformFile> _pickedFiles = [];
+  final TextEditingController _notesController = TextEditingController();
   bool _isUploading = false;
   double _uploadProgress = 0.0;
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFiles() async {
     try {
@@ -110,6 +117,7 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
         widget.task.id,
         widget.user.id,
         uploadedUrls,
+        notes: _notesController.text.trim(),
       );
 
       if (!mounted) return;
@@ -283,6 +291,24 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
                 label: const Text('Add more files'),
               ),
             ),
+          const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          const Text(
+            'Notes (Optional)',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _notesController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Add any comments or notes here...',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
           if (_isUploading)
             Column(

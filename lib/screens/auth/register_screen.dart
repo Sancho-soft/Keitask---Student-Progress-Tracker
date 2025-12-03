@@ -6,7 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../services/auth_service.dart';
-import '../../widgets/registration_success_dialog.dart';
+import 'email_verification_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -143,19 +143,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           );
         } else {
-          // Student flow: Show success animation and login
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => RegistrationSuccessDialog(
-              onComplete: () {
-                // Navigate back to login after animation completes
-                Navigator.of(context).pop(); // Close dialog
-                // Clear stack and go to Login
-                Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil('/', (route) => false);
-              },
+          // Student flow: Go to Email Verification
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => EmailVerificationScreen(user: user),
             ),
           );
         }
@@ -680,7 +671,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Colors.grey),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.blue),
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
@@ -710,7 +714,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
           decoration: InputDecoration(
             hintText: 'MM/DD/YYYY',
             hintStyle: const TextStyle(color: Colors.grey),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.blue),
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
@@ -760,7 +777,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Colors.grey),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            filled: true,
+            fillColor: Colors.grey[100],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade400),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.blue),
+            ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,

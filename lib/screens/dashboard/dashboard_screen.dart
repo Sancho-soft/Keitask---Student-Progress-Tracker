@@ -3,18 +3,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/notification_service.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
 import '../tasks/tasks_screen.dart';
 import '../profile/profile_screen.dart';
-import '../leaderboard/leaderboard_screen.dart';
 import 'admin_dashboard.dart';
 import 'user_dashboard.dart';
 import '../tasks/admin_tasks_approval_screen.dart';
 import '../admin/users_screen.dart';
 import '../admin/task_statistics_screen.dart';
+import '../leaderboard/leaderboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final User user;
@@ -157,7 +157,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         AdminDashboard(user: widget.user),
         AdminTasksApprovalScreen(user: widget.user),
         const UsersScreen(showBackButton: false),
-        const LeaderboardScreen(showBackButton: false),
+        const LeaderboardScreen(),
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),
       ];
       navItems = [
@@ -167,7 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           icon: Icons.manage_accounts,
           label: 'Manage Users',
         ),
-        const CircularNavBarItem(icon: Icons.leaderboard, label: 'Leaderboard'),
+        const CircularNavBarItem(icon: Icons.leaderboard, label: 'Rank'),
         const CircularNavBarItem(icon: Icons.person, label: 'Profile'),
       ];
     } else if (isProfessor) {
@@ -192,13 +192,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       screens = [
         UserDashboard(user: widget.user),
         TasksScreen(user: widget.user, showBackButton: false),
-        const LeaderboardScreen(showBackButton: false),
+        const LeaderboardScreen(),
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),
       ];
       navItems = [
         const CircularNavBarItem(icon: Icons.home, label: 'Home'),
         const CircularNavBarItem(icon: Icons.task, label: 'Tasks'),
-        const CircularNavBarItem(icon: Icons.leaderboard, label: 'Leaderboard'),
+        const CircularNavBarItem(icon: Icons.leaderboard, label: 'Rank'),
         const CircularNavBarItem(icon: Icons.person, label: 'Profile'),
       ];
     }

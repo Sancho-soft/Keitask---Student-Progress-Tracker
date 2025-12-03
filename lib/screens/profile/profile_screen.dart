@@ -129,30 +129,12 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Rank Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withAlpha(200),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      displayUser.rank.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.brown.shade800,
-                      ),
-                    ),
-                  ),
+                  // Rank Badge removed
                   const SizedBox(height: 12),
 
                   const SizedBox(height: 12),
 
-                  // Points & Completed summary (realtime)
+                  // Completed summary (realtime)
                   StreamBuilder<List<Task>>(
                     stream: Provider.of<FirestoreTaskService>(
                       context,
@@ -169,53 +151,9 @@ class ProfileScreen extends StatelessWidget {
                                 t.status.toLowerCase() == 'completed',
                           )
                           .length;
-                      final points = effectiveUser.points;
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(230),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.emoji_events,
-                                  color: Colors.orange,
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$points pts',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'Points',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -359,12 +297,7 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () => _showSystemPreferencesDialog(context),
                   ),
                   const SizedBox(height: 12),
-                  // Rewards button
-                  _buildSettingButton(
-                    icon: Icons.card_giftcard,
-                    label: 'Rewards',
-                    onTap: () => _showRewardsDialog(context, displayUser),
-                  ),
+                  // Rewards button removed as per request
                   const SizedBox(height: 12),
                   // Logout
                   _buildSettingButton(
@@ -882,18 +815,7 @@ class ProfileScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 16),
-                ListTile(
-                  title: const Text('Language'),
-                  subtitle: const Text('English'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Language selection coming soon'),
-                      ),
-                    );
-                  },
-                ),
+                // Language option removed as per request
               ],
             ),
           ),
@@ -924,128 +846,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _showRewardsDialog(BuildContext context, User displayUser) {
-    final auth = Provider.of<AuthService>(context, listen: false);
-    bool isRedeeming = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          final currentUser =
-              Provider.of<AuthService>(context).appUser ?? displayUser;
-          final points = currentUser.points;
-          // Determine tier and progress
-          String tier;
-          // Determine tier threshold (unused variable removed)
-          if (points >= 500) {
-            tier = 'Gold';
-          } else if (points >= 200) {
-            tier = 'Silver';
-          } else if (points >= 50) {
-            tier = 'Bronze';
-          } else {
-            tier = 'Newbie';
-          }
-
-          return AlertDialog(
-            title: const Text('Rewards'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Points: $points'),
-                const SizedBox(height: 8),
-                Text('Tier: $tier'),
-                const SizedBox(height: 12),
-                const Text('Rewards available:'),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: const Icon(Icons.stars, color: Colors.orange),
-                  title: const Text('Sticker Pack'),
-                  subtitle: const Text('Costs 50 pts'),
-                  trailing: ElevatedButton(
-                    onPressed: isRedeeming || points < 50
-                        ? null
-                        : () async {
-                            setState(() => isRedeeming = true);
-                            try {
-                              await auth.incrementUserPoints(
-                                currentUser.id,
-                                -50,
-                              );
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Sticker pack redeemed!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                              // Refresh local displayUser through AuthService listener
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Redeem failed: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            } finally {
-                              setState(() => isRedeeming = false);
-                            }
-                          },
-                    child: const Text('Redeem'),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.card_giftcard, color: Colors.blue),
-                  title: const Text('Certificate'),
-                  subtitle: const Text('Costs 200 pts'),
-                  trailing: ElevatedButton(
-                    onPressed: isRedeeming || points < 200
-                        ? null
-                        : () async {
-                            setState(() => isRedeeming = true);
-                            try {
-                              await auth.incrementUserPoints(
-                                currentUser.id,
-                                -200,
-                              );
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Certificate redeemed!'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Redeem failed: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            } finally {
-                              setState(() => isRedeeming = false);
-                            }
-                          },
-                    child: const Text('Redeem'),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+  // Rewards dialog removed
 
   // Helper: Show logout confirmation
   void _showLogoutDialog(BuildContext context) {

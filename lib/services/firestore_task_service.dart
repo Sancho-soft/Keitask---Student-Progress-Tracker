@@ -5,6 +5,7 @@ import '../models/grade_model.dart' as app_models;
 
 class FirestoreTaskService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore get firestore => _firestore;
   CollectionReference get _tasksRef => _firestore.collection('tasks');
 
   Future<void> resubmitTask(String taskId) async {
@@ -104,11 +105,7 @@ class FirestoreTaskService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> markTaskComplete(
-    String taskId, {
-    String? completedBy,
-    int rewardPoints = 10,
-  }) async {
+  Future<void> markTaskComplete(String taskId, {String? completedBy}) async {
     // If completedBy is provided, we track per-user completion
     if (completedBy != null && completedBy.isNotEmpty) {
       final taskRef = _tasksRef.doc(taskId);
@@ -123,11 +120,7 @@ class FirestoreTaskService extends ChangeNotifier {
         'completionStatus.$completedBy': DateTime.now().toIso8601String(),
       });
 
-      // Award points to the user who completed the task
-      final usersRef = _firestore.collection('users');
-      await usersRef.doc(completedBy).update({
-        'points': FieldValue.increment(rewardPoints),
-      });
+      // Points awarding logic removed as per request
 
       // Check if all assignees have completed
       final completionStatus = Map<String, dynamic>.from(
@@ -172,8 +165,9 @@ class FirestoreTaskService extends ChangeNotifier {
   Future<void> submitTask(
     String taskId,
     String userId,
-    List<String> fileUrls,
-  ) async {
+    List<String> fileUrls, {
+    String? notes,
+  }) async {
     final taskRef = _tasksRef.doc(taskId);
     final taskDoc = await taskRef.get();
     if (!taskDoc.exists) return;
@@ -184,6 +178,13 @@ class FirestoreTaskService extends ChangeNotifier {
     );
     currentSubmissions[userId] = fileUrls;
 
+    final currentSubmissionNotes = Map<String, dynamic>.from(
+      taskData['submissionNotes'] ?? {},
+    );
+    if (notes != null && notes.isNotEmpty) {
+      currentSubmissionNotes[userId] = notes;
+    }
+
     final currentCompletionStatus = Map<String, dynamic>.from(
       taskData['completionStatus'] ?? {},
     );
@@ -193,6 +194,7 @@ class FirestoreTaskService extends ChangeNotifier {
 
     await taskRef.update({
       'submissions': currentSubmissions,
+      'submissionNotes': currentSubmissionNotes,
       'completionStatus': currentCompletionStatus,
       'status': 'pending', // Always set to pending for review
     });
@@ -232,15 +234,7 @@ class FirestoreTaskService extends ChangeNotifier {
       'completionStatus': currentCompletionStatus,
     });
 
-    // Optionally award points to the student
-    // For example, if score > passing, give points.
-    // Here we just give points equal to the score for simplicity, or a fixed amount.
-    if (grade.score > 0) {
-      final usersRef = _firestore.collection('users');
-      await usersRef.doc(studentId).update({
-        'points': FieldValue.increment(grade.score.toInt()),
-      });
-    }
+    // Points awarding logic removed as per request
 
     notifyListeners();
   }

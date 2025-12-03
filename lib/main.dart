@@ -19,6 +19,7 @@ import 'models/user_model.dart'; // For type checking in routes
 import 'services/auth_service.dart';
 import 'services/firestore_task_service.dart';
 import 'services/notification_service.dart';
+import 'services/firestore_notification_service.dart';
 import 'services/theme_service.dart';
 
 // Background handler must be a top-level function (placed after imports)
@@ -127,6 +128,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => FirestoreTaskService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
+        Provider(create: (_) => FirestoreNotificationService()),
       ],
       child: MyApp(navigatorKey: appNavigatorKey),
     ),
@@ -141,9 +143,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'KeiTask Student Progress Tracker',
+      title: 'KeiTask',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        fontFamily: 'Outfit',
         colorScheme:
             ColorScheme.fromSeed(
               seedColor: const Color(0xFFB3E5FC),
@@ -161,6 +164,7 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Color(0xFF0F1724)),
         ),
         textTheme: ThemeData.light().textTheme.apply(
+          fontFamily: 'Outfit',
           bodyColor: const Color(0xFF0F1724),
           displayColor: const Color(0xFF0F1724),
         ),

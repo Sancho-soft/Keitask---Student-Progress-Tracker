@@ -7,8 +7,8 @@ class User {
   final String name;
   final String role; // 'user', 'student', 'professor', 'admin'
   final String? profileImage;
-  final int points; // Points used for leaderboard/rewards
-  final bool isApproved; // For professors requiring admin approval
+  final int points;
+  final bool isApproved;
 
   User({
     required this.id,
@@ -16,29 +16,20 @@ class User {
     required this.name,
     required this.role,
     this.profileImage,
-    this.points = 0,
-    this.isApproved = true, // Default to true for students/users
+    this.isApproved = true,
     this.enrolledCourseIds,
     this.teachingCourseIds,
     this.phoneNumber,
     this.isBanned = false,
     this.notificationsEnabled,
+    this.points = 0,
   });
 
-  final List<String>? enrolledCourseIds; // For students
-  final List<String>? teachingCourseIds; // For professors
+  final List<String>? enrolledCourseIds;
+  final List<String>? teachingCourseIds;
   final String? phoneNumber;
   final bool isBanned;
   final bool? notificationsEnabled;
-
-  String get rank {
-    if (points >= 5000) return 'Diamond';
-    if (points >= 2000) return 'Emerald';
-    if (points >= 1000) return 'Gold';
-    if (points >= 500) return 'Silver';
-    if (points >= 100) return 'Bronze';
-    return 'Novice';
-  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -47,9 +38,6 @@ class User {
       name: json['name'],
       role: json['role'],
       profileImage: json['profileImage'],
-      points: json['points'] != null
-          ? int.tryParse(json['points'].toString()) ?? 0
-          : 0,
       isApproved: json['isApproved'] ?? true,
       enrolledCourseIds: json['enrolledCourseIds'] != null
           ? List<String>.from(json['enrolledCourseIds'])
@@ -60,6 +48,7 @@ class User {
       phoneNumber: json['phoneNumber'],
       isBanned: json['isBanned'] ?? false,
       notificationsEnabled: json['notificationsEnabled'] ?? true,
+      points: json['points'] ?? 0,
     );
   }
 
@@ -70,13 +59,13 @@ class User {
       'name': name,
       'role': role,
       'profileImage': profileImage,
-      'points': points,
       'isApproved': isApproved,
       'enrolledCourseIds': enrolledCourseIds,
       'teachingCourseIds': teachingCourseIds,
       'phoneNumber': phoneNumber,
       'isBanned': isBanned,
       'notificationsEnabled': notificationsEnabled,
+      'points': points,
     };
   }
 }

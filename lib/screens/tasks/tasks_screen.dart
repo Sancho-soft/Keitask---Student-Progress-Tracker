@@ -195,6 +195,47 @@ class _TasksScreenState extends State<TasksScreen> {
                   ),
 
                 ListTile(
+                  leading: const Icon(Icons.info_outline, color: Colors.blue),
+                  title: const Text('View Details'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(task.title),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Description:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(task.description),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Due Date:',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(_formatDeadline(task.dueDate)),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+                ListTile(
                   leading: const Icon(Icons.edit, color: Colors.blue),
                   title: const Text('Edit Task'),
                   enabled:
@@ -595,8 +636,8 @@ class _TasksScreenState extends State<TasksScreen> {
       if (isApproved) return 'Approved';
       if (task.status == 'rejected') return 'Rejected';
       if (task.status == 'pending') return 'Pending Review';
-      if (task.status == 'assigned') return 'Assigned';
-      if (task.status == 'pending_approval') return 'Pending Approval';
+      if (task.status == 'assigned') return 'No Submission';
+      if (task.status == 'pending_approval') return 'No Submission';
       if (isOverdue) return 'Overdue';
       if (daysUntilDue == 0) return 'Due Today';
       if (daysUntilDue == 1) return 'Due Tomorrow';

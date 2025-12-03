@@ -7,6 +7,7 @@ import '../../models/user_model.dart';
 import '../../services/task_service.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_notification_service.dart';
 import '../admin/task_statistics_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -78,6 +79,135 @@ class _AdminDashboardState extends State<AdminDashboard> {
               );
             },
             child: const Text('Reject', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBroadcastDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final bodyController = TextEditingController();
+
+    // Check if provider exists to prevent crash (it always crash when i use it)
+    FirestoreNotificationService? notificationService;
+    try {
+      notificationService = Provider.of<FirestoreNotificationService>(
+        context,
+        listen: false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Notification service not available')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send Broadcast'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                hintText: 'e.g., System Maintenance',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: bodyController,
+              decoration: const InputDecoration(
+                labelText: 'Message',
+                hintText: 'e.g., The system will be down at midnight.',
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final title = titleController.text.trim();
+              final body = bodyController.text.trim();
+              if (title.isNotEmpty && body.isNotEmpty) {
+                notificationService?.createBroadcastNotification(title, body);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Broadcast sent successfully')),
+                );
+              }
+            },
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetLeaderboardDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Leaderboard'),
+        content: const Text(
+          'Are you sure you want to reset all student points to 0? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+
+              // Show loading
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Resetting leaderboard...')),
+              );
+
+              try {
+                final firestore = Provider.of<FirestoreTaskService>(
+                  context,
+                  listen: false,
+                );
+                // We need to implement resetLeaderboard in FirestoreTaskService or do it here
+                // Doing it here for simplicity as it's an admin action
+                final usersRef = firestore.firestore.collection('users');
+                final students = await usersRef
+                    .where('role', isEqualTo: 'student')
+                    .get();
+
+                final batch = firestore.firestore.batch();
+                for (var doc in students.docs) {
+                  batch.update(doc.reference, {'points': 0});
+                }
+                await batch.commit();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Leaderboard reset successfully'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error resetting leaderboard: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Reset', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -459,6 +589,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           );
         },
+      ),
+
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'reset_leaderboard',
+            onPressed: () => _showResetLeaderboardDialog(context),
+            backgroundColor: Colors.red,
+            child: const Icon(Icons.refresh, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'broadcast',
+            onPressed: () => _showBroadcastDialog(context),
+            backgroundColor: Colors.blue,
+            child: const Icon(Icons.campaign, color: Colors.white),
+          ),
+        ],
       ),
     );
   }

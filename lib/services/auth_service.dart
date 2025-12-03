@@ -96,7 +96,6 @@ class AuthService extends ChangeNotifier {
           email: firebaseUser?.email ?? '',
           name: firebaseUser?.displayName ?? '',
           role: 'user',
-          points: 0,
           isApproved: true,
         );
         await _firestore.collection('users').doc(uid).set(u.toJson());
@@ -119,28 +118,7 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> incrementUserPoints(String uid, int by) async {
-    try {
-      await _firestore.collection('users').doc(uid).update({
-        'points': FieldValue.increment(by),
-      });
-      // If current appUser is the target, update in-memory copy
-      if (appUser != null && appUser!.id == uid) {
-        appUser = app_models.User(
-          id: appUser!.id,
-          email: appUser!.email,
-          name: appUser!.name,
-          role: appUser!.role,
-          profileImage: appUser!.profileImage,
-          points: (appUser!.points) + by,
-          isApproved: appUser!.isApproved,
-        );
-        notifyListeners();
-      }
-    } catch (_) {
-      rethrow;
-    }
-  }
+  // incrementUserPoints removed as per request
 
   Future<String?> _uploadProfileImage(
     String uid,
@@ -411,7 +389,6 @@ class AuthService extends ChangeNotifier {
         name: appUser!.name,
         role: appUser!.role,
         profileImage: appUser!.profileImage,
-        points: appUser!.points,
         isApproved: isApproved,
         phoneNumber: appUser!.phoneNumber,
         isBanned: appUser!.isBanned,
@@ -435,7 +412,6 @@ class AuthService extends ChangeNotifier {
           name: appUser!.name,
           role: appUser!.role,
           profileImage: appUser!.profileImage,
-          points: appUser!.points,
           isApproved: appUser!.isApproved,
           phoneNumber: appUser!.phoneNumber,
           isBanned: isBanned,
@@ -474,7 +450,6 @@ class AuthService extends ChangeNotifier {
           name: appUser!.name,
           role: appUser!.role,
           profileImage: appUser!.profileImage,
-          points: appUser!.points,
           isApproved: appUser!.isApproved,
           enrolledCourseIds: appUser!.enrolledCourseIds,
           teachingCourseIds: appUser!.teachingCourseIds,

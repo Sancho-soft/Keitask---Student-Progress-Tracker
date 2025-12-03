@@ -200,7 +200,9 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
           ),
 
           // Filter Chips (Matching Figma: All/Pending/Approvals)
-          Padding(
+          // Filter Chips (Matching Figma: All/Pending/Approvals)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               children: [
@@ -227,6 +229,14 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                     isSelected: _filterStatus == 'approvals',
                   ),
                 ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => setState(() => _filterStatus = 'completed'),
+                  child: _buildFilterChip(
+                    'Completed',
+                    isSelected: _filterStatus == 'completed',
+                  ),
+                ),
               ],
             ),
           ),
@@ -243,7 +253,12 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
 
                 final allTasks = snapshot.data ?? [];
 
-                var filteredTasks = allTasks;
+                // Deduplicate tasks based on ID
+                final uniqueTasksMap = <String, Task>{};
+                for (var task in allTasks) {
+                  uniqueTasksMap[task.id] = task;
+                }
+                var filteredTasks = uniqueTasksMap.values.toList();
 
                 // Search Filter
                 if (_searchQuery.isNotEmpty) {
@@ -272,6 +287,14 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                   filteredTasks = filteredTasks
                       .where(
                         (t) => t.status.toLowerCase() == 'pending_approval',
+                      )
+                      .toList();
+                } else if (_filterStatus == 'completed') {
+                  filteredTasks = filteredTasks
+                      .where(
+                        (t) =>
+                            t.status.toLowerCase() == 'completed' ||
+                            t.status.toLowerCase() == 'approved',
                       )
                       .toList();
                 }
@@ -432,91 +455,37 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
               const SizedBox(height: 12),
             ],
 
-            // Submission Display (if any)
-            if (task.submissions != null &&
-                task.assignees.isNotEmpty &&
-                task.submissions!.containsKey(task.assignees.first)) ...[
-              const Text(
-                'Submission:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-              ),
-              const SizedBox(height: 4),
-              ...task.submissions![task.assignees.first]!.map((url) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: InkWell(
-                    onTap: () {
-                      // In a real app, launch URL. For now, show dialog or print.
-                      // Since we can't easily launch URLs without url_launcher (which might not be set up),
-                      // we'll show the URL in a dialog for copy-paste or just indicate it's a file.
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Submission Link'),
-                          content: SelectableText(url),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.attachment,
-                          size: 16,
-                          color: Colors.blue,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            url.split('/').last, // Simple filename display
-                            style: const TextStyle(
-                              color: Colors.blue,
-                              decoration: TextDecoration.underline,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-              const SizedBox(height: 12),
-            ],
-
             // Status and Notes Area (Matching Figma)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Status Chip
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withAlpha((0.1 * 255).round()),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  // Status Chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withAlpha((0.1 * 255).round()),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                // Rejection Reason (if rejected)
-                if (isRejected && task.rejectionReason != null) ...[
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 12),
+                  const SizedBox(width: 8),
+
+                  // Rejection Reason (if rejected)
+                  if (isRejected && task.rejectionReason != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
                       child: Text(
                         'Reason: ${task.rejectionReason}',
                         style: TextStyle(
@@ -524,111 +493,72 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                           color: Colors.red[700],
                           fontStyle: FontStyle.italic,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    height: 28,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await firestoreTaskService.resubmitTask(task.id);
-                        if (!context.mounted) return;
-                        _showFeedback(context, 'Task marked for resubmission.');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 28,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await firestoreTaskService.resubmitTask(task.id);
+                          if (!context.mounted) return;
+                          _showFeedback(
+                            context,
+                            'Task marked for resubmission.',
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          elevation: 0,
                         ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Resubmit',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                        child: const Text(
+                          'Resubmit',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ] else if (isPendingSubmission || isPendingApproval)
-                  // Approve and Reject Buttons
-                  // Only show if Admin OR (if it's a submission and user is professor)
-                  // But for 'pending_approval' (Task Approval), ONLY Admin can approve.
-                  if (widget.user.role == 'admin' ||
-                      (!isPendingApproval && widget.user.role == 'professor'))
-                    Row(
-                      children: [
-                        // Approve Button
-                        SizedBox(
-                          height: 28,
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              if (isPendingApproval) {
-                                await firestoreTaskService.approveProfessorTask(
-                                  task.id,
-                                );
-                                if (!context.mounted) return;
-                                _showFeedback(
-                                  context,
-                                  'Task Approved (Assigned).',
-                                );
-                              } else {
-                                await firestoreTaskService.approveTask(task.id);
-                                if (!context.mounted) return;
-                                _showFeedback(
-                                  context,
-                                  'Task Approved (Completed).',
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: const Text(
-                              'Approve',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 8),
-                        // Grade Button (For Professors reviewing submissions)
-                        if (isPendingSubmission &&
-                            widget.user.role == 'professor')
+                  ] else if (isPendingSubmission || isPendingApproval)
+                    // Approve and Reject Buttons
+                    if (widget.user.role == 'admin' ||
+                        (!isPendingApproval && widget.user.role == 'professor'))
+                      Row(
+                        children: [
+                          // Approve Button
                           SizedBox(
                             height: 28,
                             child: ElevatedButton(
-                              onPressed: () {
-                                // For now, assume single assignee for grading simplicity
-                                // In multi-assign, we'd need to select which student to grade
-                                if (task.assignees.isNotEmpty) {
-                                  _showGradeDialog(
+                              onPressed: () async {
+                                if (isPendingApproval) {
+                                  await firestoreTaskService
+                                      .approveProfessorTask(task.id);
+                                  if (!context.mounted) return;
+                                  _showFeedback(
                                     context,
+                                    'Task Approved (Assigned).',
+                                  );
+                                } else {
+                                  await firestoreTaskService.approveTask(
                                     task.id,
-                                    task.assignees.first,
-                                    firestoreTaskService,
+                                  );
+                                  if (!context.mounted) return;
+                                  _showFeedback(
+                                    context,
+                                    'Task Approved (Completed).',
                                   );
                                 }
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber[700],
+                                backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 10,
@@ -639,7 +569,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                                 elevation: 0,
                               ),
                               child: const Text(
-                                'Grade',
+                                'Approve',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -647,41 +577,81 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                               ),
                             ),
                           ),
-                        const SizedBox(width: 8),
-                        // Reject Button
-                        SizedBox(
-                          height: 28,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              _showRejectDialog(
-                                context,
-                                task.id,
-                                firestoreTaskService,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
+
+                          const SizedBox(width: 8),
+                          // Grade Button (For Professors reviewing submissions)
+                          if (isPendingSubmission &&
+                              widget.user.role == 'professor') ...[
+                            SizedBox(
+                              height: 28,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (task.assignees.isNotEmpty) {
+                                    _showGradeDialog(
+                                      context,
+                                      task.id,
+                                      task.assignees.first,
+                                      firestoreTaskService,
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.amber[700],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: const Text(
+                                  'Grade',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              elevation: 0,
                             ),
-                            child: const Text(
-                              'Reject',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                            const SizedBox(width: 8),
+                          ],
+                          // Reject Button
+                          SizedBox(
+                            height: 28,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                _showRejectDialog(
+                                  context,
+                                  task.id,
+                                  firestoreTaskService,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Reject',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-              ],
+                        ],
+                      ),
+                ],
+              ),
             ),
           ],
         ),
