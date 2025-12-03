@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../services/task_service.dart';
 import '../../services/firestore_task_service.dart';
+import '../../models/grade_model.dart';
 
 class AdminTasksApprovalScreen extends StatefulWidget {
   final User user;
@@ -17,10 +18,91 @@ class AdminTasksApprovalScreen extends StatefulWidget {
 
 class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
   String _filterStatus = 'all'; // Track filter state
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _showFeedback(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  void _showGradeDialog(
+    BuildContext context,
+    String taskId,
+    String studentId,
+    FirestoreTaskService firestoreTaskService,
+  ) {
+    final scoreController = TextEditingController();
+    final commentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Grade Submission'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: scoreController,
+              decoration: const InputDecoration(
+                labelText: 'Score (0-100)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: commentController,
+              decoration: const InputDecoration(
+                labelText: 'Comment (Optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final scoreText = scoreController.text.trim();
+              if (scoreText.isEmpty) {
+                _showFeedback(context, 'Please enter a score');
+                return;
+              }
+              final score = double.tryParse(scoreText);
+              if (score == null || score < 0 || score > 100) {
+                _showFeedback(context, 'Invalid score (0-100)');
+                return;
+              }
+
+              final grade = Grade(
+                score: score,
+                maxScore: 100,
+                comment: commentController.text.trim(),
+                gradedBy: widget.user.id,
+                gradedAt: DateTime.now(),
+              );
+
+              await firestoreTaskService.gradeTask(taskId, studentId, grade);
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              _showFeedback(context, 'Task graded successfully');
+            },
+            child: const Text('Save Grade'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -100,6 +182,9 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              controller: _searchController,
+              onChanged: (value) =>
+                  setState(() => _searchQuery = value.toLowerCase()),
               decoration: InputDecoration(
                 hintText: 'Search Tasks...',
                 prefixIcon: const Icon(Icons.search),
@@ -158,10 +243,25 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
 
                 final allTasks = snapshot.data ?? [];
 
-                // Apply filter
-                List<Task> filteredTasks = allTasks;
+                var filteredTasks = allTasks;
+
+                // Search Filter
+                if (_searchQuery.isNotEmpty) {
+                  filteredTasks = filteredTasks
+                      .where(
+                        (t) => t.title.toLowerCase().contains(_searchQuery),
+                      )
+                      .toList();
+                }
+
+                // If Professor, only show tasks created by them
+                if (widget.user.role == 'professor') {
+                  filteredTasks = filteredTasks
+                      .where((t) => t.creator == widget.user.id)
+                      .toList();
+                }
                 if (_filterStatus == 'pending') {
-                  filteredTasks = allTasks
+                  filteredTasks = filteredTasks
                       .where(
                         (t) =>
                             t.status.toLowerCase() == 'pending' ||
@@ -169,7 +269,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                       )
                       .toList();
                 } else if (_filterStatus == 'approvals') {
-                  filteredTasks = allTasks
+                  filteredTasks = filteredTasks
                       .where(
                         (t) => t.status.toLowerCase() == 'pending_approval',
                       )
@@ -277,6 +377,117 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
             ),
 
             const SizedBox(height: 12),
+
+            // Submission Display (if any)
+            if (task.submissions != null &&
+                task.assignees.isNotEmpty &&
+                task.submissions!.containsKey(task.assignees.first)) ...[
+              const Text(
+                'Submission:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              ...task.submissions![task.assignees.first]!.map((url) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Submission Link'),
+                          content: SelectableText(url),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.attachment,
+                          size: 16,
+                          color: Colors.blue,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            url.split('/').last,
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
+
+            // Submission Display (if any)
+            if (task.submissions != null &&
+                task.assignees.isNotEmpty &&
+                task.submissions!.containsKey(task.assignees.first)) ...[
+              const Text(
+                'Submission:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              ...task.submissions![task.assignees.first]!.map((url) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: InkWell(
+                    onTap: () {
+                      // In a real app, launch URL. For now, show dialog or print.
+                      // Since we can't easily launch URLs without url_launcher (which might not be set up),
+                      // we'll show the URL in a dialog for copy-paste or just indicate it's a file.
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Submission Link'),
+                          content: SelectableText(url),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.attachment,
+                          size: 16,
+                          color: Colors.blue,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            url.split('/').last, // Simple filename display
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
 
             // Status and Notes Area (Matching Figma)
             Row(
@@ -396,6 +607,46 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                             ),
                           ),
                         ),
+
+                        const SizedBox(width: 8),
+                        // Grade Button (For Professors reviewing submissions)
+                        if (isPendingSubmission &&
+                            widget.user.role == 'professor')
+                          SizedBox(
+                            height: 28,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                // For now, assume single assignee for grading simplicity
+                                // In multi-assign, we'd need to select which student to grade
+                                if (task.assignees.isNotEmpty) {
+                                  _showGradeDialog(
+                                    context,
+                                    task.id,
+                                    task.assignees.first,
+                                    firestoreTaskService,
+                                  );
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber[700],
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Grade',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
                         const SizedBox(width: 8),
                         // Reject Button
                         SizedBox(

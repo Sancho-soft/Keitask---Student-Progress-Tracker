@@ -621,7 +621,7 @@ class _UserDashboardState extends State<UserDashboard> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  task.status.toUpperCase(),
+                  _formatStatus(task.status),
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -848,6 +848,10 @@ class _UserDashboardState extends State<UserDashboard> {
         return const Color(0xFFE8F5E9);
       case 'pending':
         return const Color(0xFFFFF3E0);
+      case 'assigned':
+        return const Color(0xFFE3F2FD); // Light Blue
+      case 'pending_approval':
+        return const Color(0xFFFFF8E1); // Light Amber
       case 'rejected':
         return const Color(0xFFFFEBEE);
       case 'resubmitted':
@@ -864,12 +868,38 @@ class _UserDashboardState extends State<UserDashboard> {
         return Colors.green;
       case 'pending':
         return Colors.orange;
+      case 'assigned':
+        return Colors.blue;
+      case 'pending_approval':
+        return Colors.amber;
       case 'rejected':
         return Colors.red;
       case 'resubmitted':
         return Colors.purple;
       default:
         return Colors.grey;
+    }
+  }
+
+  String _formatStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'Pending Review';
+      case 'assigned':
+        return 'Assigned';
+      case 'pending_approval':
+        return 'Pending Approval';
+      case 'completed':
+        return 'Completed';
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'resubmitted':
+        return 'Resubmitted';
+      default:
+        if (status.isEmpty) return '';
+        return status[0].toUpperCase() + status.substring(1);
     }
   }
 }

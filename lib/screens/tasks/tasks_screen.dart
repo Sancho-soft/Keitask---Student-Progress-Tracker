@@ -595,6 +595,8 @@ class _TasksScreenState extends State<TasksScreen> {
       if (isApproved) return 'Approved';
       if (task.status == 'rejected') return 'Rejected';
       if (task.status == 'pending') return 'Pending Review';
+      if (task.status == 'assigned') return 'Assigned';
+      if (task.status == 'pending_approval') return 'Pending Approval';
       if (isOverdue) return 'Overdue';
       if (daysUntilDue == 0) return 'Due Today';
       if (daysUntilDue == 1) return 'Due Tomorrow';
@@ -738,6 +740,54 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ],
             ),
+
+            // Grade Display
+            if (effectiveUser != null &&
+                task.grades != null &&
+                task.grades!.containsKey(effectiveUser.id)) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withAlpha(30),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Grade: ${task.grades![effectiveUser.id]!.score.toStringAsFixed(1)} / 100',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber[900],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (task.grades![effectiveUser.id]!.comment != null &&
+                        task
+                            .grades![effectiveUser.id]!
+                            .comment!
+                            .isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Comment: ${task.grades![effectiveUser.id]!.comment}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.amber[900],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
 
             if (task.assignees.isNotEmpty) ...[
               const SizedBox(height: 12),

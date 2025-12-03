@@ -12,7 +12,12 @@
           "package_name": "com.example.keitask_management"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "586243403586-73egkkb44dnm7vmimvdtjp8k24freke5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC1qUJSZiRq8uiMmd1VeIJVzyzCLC3-f2c"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "586243403586-73egkkb44dnm7vmimvdtjp8k24freke5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "586243403586-v3bapb4kkaqqi0ft6gm9heepvu2k5q8b.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.keitaskManagement"
+              }
+            }
+          ]
         }
       }
     }

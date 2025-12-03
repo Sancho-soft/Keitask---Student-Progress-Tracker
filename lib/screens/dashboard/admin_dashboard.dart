@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../models/user_model.dart';
 import '../../services/task_service.dart';
 import '../../services/firestore_task_service.dart';
@@ -91,372 +92,377 @@ class _AdminDashboardState extends State<AdminDashboard> {
     final auth = Provider.of<AuthService>(context, listen: false);
 
     // Stream tasks and derive counts from Firestore to ensure accuracy
-    return StreamBuilder<List<Task>>(
-      stream: firestoreTaskService.tasksStream(),
-      builder: (context, snapshot) {
-        final allTasks = snapshot.data ?? [];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: StreamBuilder<List<Task>>(
+        stream: firestoreTaskService.tasksStream(),
+        builder: (context, snapshot) {
+          final allTasks = snapshot.data ?? [];
 
-        final approvedCount = allTasks
-            .where((t) => t.status.toLowerCase() == 'approved')
-            .length;
-        final pendingCount = allTasks
-            .where((t) => t.status.toLowerCase() == 'pending')
-            .length;
-        final rejectedCount = allTasks
-            .where((t) => t.status.toLowerCase() == 'rejected')
-            .length;
-        final resubmittedCount = allTasks
-            .where(
-              (t) =>
-                  t.status.toLowerCase() == 'resubmitted' ||
-                  t.status.toLowerCase() == 'resubmit',
-            )
-            .length;
+          final approvedCount = allTasks
+              .where((t) => t.status.toLowerCase() == 'approved')
+              .length;
+          final pendingCount = allTasks
+              .where((t) => t.status.toLowerCase() == 'pending')
+              .length;
+          final rejectedCount = allTasks
+              .where((t) => t.status.toLowerCase() == 'rejected')
+              .length;
+          final resubmittedCount = allTasks
+              .where(
+                (t) =>
+                    t.status.toLowerCase() == 'resubmitted' ||
+                    t.status.toLowerCase() == 'resubmit',
+              )
+              .length;
 
-        final pendingTasksReviews = allTasks
-            .where(
-              (task) =>
-                  task.status.toLowerCase() == 'pending' ||
-                  task.status.toLowerCase() == 'resubmitted',
-            )
-            .toList();
+          final pendingTasksReviews = allTasks
+              .where(
+                (task) =>
+                    task.status.toLowerCase() == 'pending' ||
+                    task.status.toLowerCase() == 'resubmitted',
+              )
+              .toList();
 
-        return SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Blue Header Section
-                Container(
-                  width: double.infinity,
-                  color: Colors.blue,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 20,
+          return SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Blue Header Section
+                  Container(
+                    width: double.infinity,
+                    color: Colors.blue,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 20,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Hi, ${auth.appUser?.name ?? widget.user.name}!',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Track your progress below.',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.white,
+                          backgroundImage:
+                              (auth.appUser?.profileImage != null &&
+                                  auth.appUser!.profileImage!.isNotEmpty)
+                              ? NetworkImage(auth.appUser!.profileImage!)
+                                    as ImageProvider
+                              : null,
+                          child:
+                              (auth.appUser == null ||
+                                  auth.appUser!.profileImage == null ||
+                                  auth.appUser!.profileImage!.isEmpty)
+                              ? Text(
+                                  widget.user.name.isNotEmpty
+                                      ? widget.user.name[0].toUpperCase()
+                                      : 'A',
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  // Content Section
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Status Cards Grid (2x2) - OVERFLOW FIX APPLIED HERE
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio:
+                              1.5, // FIX: This resolves the overflow
                           children: [
-                            Text(
-                              'Hi, ${auth.appUser?.name ?? widget.user.name}!',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            _buildStatCard(
+                              'Approved',
+                              '$approvedCount',
+                              const Color(0xFFE8F5E9),
+                              Colors.green,
+                              Icons.check_circle,
+                            ),
+                            _buildStatCard(
+                              'Pending',
+                              '$pendingCount',
+                              const Color(0xFFFFF3E0),
+                              Colors.orange,
+                              Icons.schedule,
+                            ),
+                            _buildStatCard(
+                              'Rejected',
+                              '$rejectedCount',
+                              const Color(0xFFFFEBEE),
+                              Colors.red,
+                              Icons.cancel,
+                            ),
+                            _buildStatCard(
+                              'Resubmitted',
+                              '$resubmittedCount',
+                              const Color(0xFFF3E5F5),
+                              Colors.purple,
+                              Icons.refresh,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Pending Tasks Reviews Section
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Pending Tasks Reviews',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Track your progress below.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
+                            TextButton(
+                              onPressed: () {
+                                // Navigates to the dedicated approval screen (Tasks tab)
+                                // Note: AdminTasksApprovalScreen uses this same data source.
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const TaskStatisticsScreen(),
+                                  ),
+                                ).then((_) => _refresh());
+                              },
+                              child: const Text(
+                                'See all',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.white,
-                        backgroundImage:
-                            (auth.appUser?.profileImage != null &&
-                                auth.appUser!.profileImage!.isNotEmpty)
-                            ? NetworkImage(auth.appUser!.profileImage!)
-                                  as ImageProvider
-                            : null,
-                        child:
-                            (auth.appUser == null ||
-                                auth.appUser!.profileImage == null ||
-                                auth.appUser!.profileImage!.isEmpty)
-                            ? Text(
-                                widget.user.name.isNotEmpty
-                                    ? widget.user.name[0].toUpperCase()
-                                    : 'A',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
+                        const SizedBox(height: 12),
+                        pendingTasksReviews.isEmpty
+                            ? Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(24),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.task_alt,
+                                        size: 48,
+                                        color: Colors.grey[400],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'No pending reviews',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'All tasks have been reviewed',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[500],
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               )
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-                // Content Section
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Status Cards Grid (2x2) - OVERFLOW FIX APPLIED HERE
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio:
-                            1.5, // FIX: This resolves the overflow
-                        children: [
-                          _buildStatCard(
-                            'Approved',
-                            '$approvedCount',
-                            const Color(0xFFE8F5E9),
-                            Colors.green,
-                            Icons.check_circle,
-                          ),
-                          _buildStatCard(
-                            'Pending',
-                            '$pendingCount',
-                            const Color(0xFFFFF3E0),
-                            Colors.orange,
-                            Icons.schedule,
-                          ),
-                          _buildStatCard(
-                            'Rejected',
-                            '$rejectedCount',
-                            const Color(0xFFFFEBEE),
-                            Colors.red,
-                            Icons.cancel,
-                          ),
-                          _buildStatCard(
-                            'Resubmitted',
-                            '$resubmittedCount',
-                            const Color(0xFFF3E5F5),
-                            Colors.purple,
-                            Icons.refresh,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: pendingTasksReviews.length,
+                                itemBuilder: (context, index) {
+                                  final task = pendingTasksReviews[index];
+                                  final assigneeId = task.assignees.isNotEmpty
+                                      ? task.assignees.first
+                                      : '';
+                                  final assigneeName = assigneeId.isNotEmpty
+                                      ? taskService.getUserName(assigneeId)
+                                      : '';
 
-                      // Pending Tasks Reviews Section
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Pending Tasks Reviews',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              // Navigates to the dedicated approval screen (Tasks tab)
-                              // Note: AdminTasksApprovalScreen uses this same data source.
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      const TaskStatisticsScreen(),
-                                ),
-                              ).then((_) => _refresh());
-                            },
-                            child: const Text(
-                              'See all',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      pendingTasksReviews.isEmpty
-                          ? Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[50],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.task_alt,
-                                      size: 48,
-                                      color: Colors.grey[400],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'No pending reviews',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[600],
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(12),
+                                        color: Colors.white,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.grey.withAlpha(
+                                              (0.1 * 255).round(),
+                                            ),
+                                            spreadRadius: 1,
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'All tasks have been reviewed',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey[500],
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: pendingTasksReviews.length,
-                              itemBuilder: (context, index) {
-                                final task = pendingTasksReviews[index];
-                                final assigneeId = task.assignees.isNotEmpty
-                                    ? task.assignees.first
-                                    : '';
-                                final assigneeName = assigneeId.isNotEmpty
-                                    ? taskService.getUserName(assigneeId)
-                                    : '';
-
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      color: Colors.white,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.grey.withAlpha(
-                                            (0.1 * 255).round(),
-                                          ),
-                                          spreadRadius: 1,
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                task.title,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: Colors.black87,
+                                      padding: const EdgeInsets.all(16),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  task.title,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.black87,
+                                                  ),
                                                 ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                'by $assigneeName', // Now displays name
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey,
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'by $assigneeName', // Now displays name
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey,
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.visibility,
-                                            color: Colors.blue,
-                                          ),
-                                          onPressed: () {
-                                            // View task details
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: Text(task.title),
-                                                content: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      'Description: ${task.description}',
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.visibility,
+                                              color: Colors.blue,
+                                            ),
+                                            onPressed: () {
+                                              // View task details
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: Text(task.title),
+                                                  content: Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        'Description: ${task.description}',
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Text(
+                                                        'Assignee: $assigneeName',
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Text(
+                                                        'Due Date: ${_formatDate(task.dueDate)}',
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        Navigator.pop(context);
+                                                        _showRejectDialog(
+                                                          context,
+                                                          task.id,
+                                                          firestoreTaskService,
+                                                        );
+                                                      },
+                                                      child: const Text(
+                                                        'Reject',
+                                                        style: TextStyle(
+                                                          color: Colors.red,
+                                                        ),
+                                                      ),
                                                     ),
-                                                    const SizedBox(height: 8),
-                                                    Text(
-                                                      'Assignee: $assigneeName',
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Text(
-                                                      'Due Date: ${_formatDate(task.dueDate)}',
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        // Use the FirestoreTaskService method
+                                                        firestoreTaskService
+                                                            .approveTask(
+                                                              task.id,
+                                                            );
+                                                        Navigator.pop(context);
+                                                        ScaffoldMessenger.of(
+                                                          context,
+                                                        ).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Task approved',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      child: const Text(
+                                                        'Approve',
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(context);
-                                                      _showRejectDialog(
-                                                        context,
-                                                        task.id,
-                                                        firestoreTaskService,
-                                                      );
-                                                    },
-                                                    child: const Text(
-                                                      'Reject',
-                                                      style: TextStyle(
-                                                        color: Colors.red,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      // Use the FirestoreTaskService method
-                                                      firestoreTaskService
-                                                          .approveTask(task.id);
-                                                      Navigator.pop(context);
-                                                      ScaffoldMessenger.of(
-                                                        context,
-                                                      ).showSnackBar(
-                                                        const SnackBar(
-                                                          content: Text(
-                                                            'Task approved',
-                                                          ),
-                                                        ),
-                                                      );
-                                                    },
-                                                    child: const Text(
-                                                      'Approve',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ],
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ],
+                                  );
+                                },
+                              ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
-  // --- Helper Widgets ---
   Widget _buildStatCard(
     String title,
     String count,

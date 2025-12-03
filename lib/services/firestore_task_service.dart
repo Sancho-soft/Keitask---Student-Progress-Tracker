@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart' as app_models;
+import '../models/grade_model.dart' as app_models;
 
 class FirestoreTaskService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -39,6 +40,23 @@ class FirestoreTaskService extends ChangeNotifier {
   Future<void> createTask(app_models.Task task) async {
     // Persist all task fields including courseId, grades, etc.
     await _tasksRef.doc(task.id).set(task.toJson());
+
+    // Create notifications for assignees
+    final batch = _firestore.batch();
+    for (var assigneeId in task.assignees) {
+      final notifRef = _firestore.collection('notifications').doc();
+      batch.set(notifRef, {
+        'recipientId': assigneeId,
+        'title': 'New Task Assigned',
+        'body': 'You have been assigned a new task: ${task.title}',
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'type': 'task_assigned',
+        'relatedId': task.id,
+      });
+    }
+    await batch.commit();
+
     notifyListeners();
   }
 
@@ -183,6 +201,47 @@ class FirestoreTaskService extends ChangeNotifier {
 
   Future<void> deleteTask(String taskId) async {
     await _tasksRef.doc(taskId).delete();
+    notifyListeners();
+  }
+
+  Future<void> gradeTask(
+    String taskId,
+    String studentId,
+    app_models.Grade grade,
+  ) async {
+    final taskRef = _tasksRef.doc(taskId);
+    final taskDoc = await taskRef.get();
+    if (!taskDoc.exists) return;
+
+    final taskData = taskDoc.data() as Map<String, dynamic>;
+    final currentGrades = Map<String, dynamic>.from(taskData['grades'] ?? {});
+    currentGrades[studentId] = grade.toJson();
+
+    // Update the task with the new grade
+    // Note: We don't necessarily mark the task as 'completed' for everyone,
+    // but for the specific student it is effectively graded.
+    // If you want to mark it completed for that student in 'completionStatus', you can do so.
+    final currentCompletionStatus = Map<String, dynamic>.from(
+      taskData['completionStatus'] ?? {},
+    );
+    // Ensure it's marked as completed for the student if graded
+    currentCompletionStatus[studentId] = DateTime.now().toIso8601String();
+
+    await taskRef.update({
+      'grades': currentGrades,
+      'completionStatus': currentCompletionStatus,
+    });
+
+    // Optionally award points to the student
+    // For example, if score > passing, give points.
+    // Here we just give points equal to the score for simplicity, or a fixed amount.
+    if (grade.score > 0) {
+      final usersRef = _firestore.collection('users');
+      await usersRef.doc(studentId).update({
+        'points': FieldValue.increment(grade.score.toInt()),
+      });
+    }
+
     notifyListeners();
   }
 }

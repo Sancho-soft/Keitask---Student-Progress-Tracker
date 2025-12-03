@@ -62,16 +62,21 @@ class AuthService extends ChangeNotifier {
         },
       );
       // Listen for token refreshes and persist for the user if signed in
-      FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
-        try {
-          final uid = firebaseUser?.uid;
-          if (uid != null) {
-            await _firestore.collection('users').doc(uid).update({
-              'fcmToken': token,
-            });
-          }
-        } catch (_) {}
-      });
+      FirebaseMessaging.instance.onTokenRefresh.listen(
+        (token) async {
+          try {
+            final uid = firebaseUser?.uid;
+            if (uid != null) {
+              await _firestore.collection('users').doc(uid).update({
+                'fcmToken': token,
+              });
+            }
+          } catch (_) {}
+        },
+        onError: (e) {
+          debugPrint('Error in token refresh stream: $e');
+        },
+      );
     } catch (e) {
       _initError = 'AuthService init failed: $e';
       notifyListeners();
@@ -238,6 +243,7 @@ class AuthService extends ChangeNotifier {
     required String password,
     String role = 'user',
     File? profileImageFile,
+    String? phoneNumber,
   }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -262,6 +268,7 @@ class AuthService extends ChangeNotifier {
       role: role,
       profileImage: photoUrl,
       isApproved: role != 'professor', // Professors need approval
+      phoneNumber: phoneNumber,
     );
     await _firestore.collection('users').doc(uid).set(userRecord.toJson());
     appUser = userRecord;

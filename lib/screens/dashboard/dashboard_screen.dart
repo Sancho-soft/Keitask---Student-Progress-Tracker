@@ -47,29 +47,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _listenForNewTasks() {
     final firestore = Provider.of<FirestoreTaskService>(context, listen: false);
-    firestore.tasksStream().listen((tasks) {
-      if (!mounted) return;
+    firestore.tasksStream().listen(
+      (tasks) {
+        if (!mounted) return;
 
-      // Filter tasks assigned to this user
-      final myTasks = tasks
-          .where((t) => t.assignees.contains(widget.user.id))
-          .toList();
+        // Filter tasks assigned to this user
+        final myTasks = tasks
+            .where((t) => t.assignees.contains(widget.user.id))
+            .toList();
 
-      if (_isFirstLoad) {
-        _knownTaskIds = myTasks.map((t) => t.id).toSet();
-        _isFirstLoad = false;
-        return;
-      }
-
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final userPrefs = authService.appUser?.notificationsEnabled ?? true;
-      for (var task in myTasks) {
-        if (!_knownTaskIds.contains(task.id)) {
-          _knownTaskIds.add(task.id);
-          if (userPrefs) NotificationService.showTaskNotification(task);
+        if (_isFirstLoad) {
+          _knownTaskIds = myTasks.map((t) => t.id).toSet();
+          _isFirstLoad = false;
+          return;
         }
-      }
-    });
+
+        final authService = Provider.of<AuthService>(context, listen: false);
+        final userPrefs = authService.appUser?.notificationsEnabled ?? true;
+        for (var task in myTasks) {
+          if (!_knownTaskIds.contains(task.id)) {
+            _knownTaskIds.add(task.id);
+            if (userPrefs) NotificationService.showTaskNotification(task);
+          }
+        }
+      },
+      onError: (e) {
+        debugPrint('Error in tasks stream: $e');
+      },
+    );
 
     // Listen for admin notifications
     FirebaseFirestore.instance
@@ -77,28 +82,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .where('recipientId', isEqualTo: widget.user.id)
         .where('read', isEqualTo: false)
         .snapshots()
-        .listen((snapshot) {
-          if (!mounted) return;
-          for (var change in snapshot.docChanges) {
-            if (change.type == DocumentChangeType.added) {
-              final data = change.doc.data();
-              if (data != null) {
-                final title = data['title'] as String? ?? 'New Notification';
-                final body = data['body'] as String? ?? '';
+        .listen(
+          (snapshot) {
+            if (!mounted) return;
+            for (var change in snapshot.docChanges) {
+              if (change.type == DocumentChangeType.added) {
+                final data = change.doc.data();
+                if (data != null) {
+                  final title = data['title'] as String? ?? 'New Notification';
+                  final body = data['body'] as String? ?? '';
 
-                // Mark as read immediately to avoid re-showing
-                change.doc.reference.update({'read': true});
+                  // Mark as read immediately to avoid re-showing
+                  change.doc.reference.update({'read': true});
 
-                // Show local notification
-                NotificationService.showGeneralNotification(
-                  id: change.doc.hashCode,
-                  title: title,
-                  body: body,
-                );
+                  // Show local notification
+                  NotificationService.showGeneralNotification(
+                    id: change.doc.hashCode,
+                    title: title,
+                    body: body,
+                  );
+                }
               }
             }
-          }
-        });
+          },
+          onError: (e) {
+            debugPrint('Error in notifications stream: $e');
+          },
+        );
   }
 
   // Removed the local plugin wrapper in favor of NotificationService
@@ -203,22 +213,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       // Add a debug FAB for quick notification testing in debug mode
-      floatingActionButton: kDebugMode
-          ? FloatingActionButton(
-              onPressed: () {
-                final demoTask = Task(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  title: 'Demo Task',
-                  description: 'This is a demo task notification',
-                  status: 'approved',
-                  assignees: [widget.user.id],
-                  dueDate: DateTime.now().add(const Duration(days: 1)),
-                );
-                NotificationService.showTaskNotification(demoTask);
-              },
-              child: const Icon(Icons.notifications),
-            )
-          : null,
+      floatingActionButton: null,
       extendBody: false,
       body: PageView(
         controller: _pageController,

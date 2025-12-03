@@ -164,9 +164,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     // Professors: 'pending_approval' (needs admin review)
     // Others (if any): 'pending'
     String initialStatus = 'pending';
-    if (widget.user?.role == 'admin') {
+    if (user?.role == 'admin') {
       initialStatus = 'assigned';
-    } else if (widget.user?.role == 'professor') {
+    } else if (user?.role == 'professor') {
       initialStatus = 'pending_approval';
     }
 

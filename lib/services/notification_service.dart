@@ -110,6 +110,13 @@ class NotificationService {
           importance: Importance.high,
         );
         await androidPlugin.createNotificationChannel(fcmChannel);
+        const generalChannel = AndroidNotificationChannel(
+          'general_channel',
+          'General Notifications',
+          description: 'General app notifications',
+          importance: Importance.high,
+        );
+        await androidPlugin.createNotificationChannel(generalChannel);
       }
     } catch (e) {
       supported = false;
