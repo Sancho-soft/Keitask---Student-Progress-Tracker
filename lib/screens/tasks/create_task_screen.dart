@@ -34,6 +34,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final TextEditingController _requestedAssigneesController =
       TextEditingController();
   bool _allowMultipleAssign = false;
+  bool _assignToAll = false;
   bool _isCreating = false;
 
   @override
@@ -106,7 +107,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
     // allow non-admins to create pending tasks (no early return)
     // Only enforce assignee selection for admins
-    if (adminCreate && _selectedAssigneeIds.isEmpty) {
+    // Only enforce assignee selection for admins if not assigning to all
+    if (adminCreate && !_assignToAll && _selectedAssigneeIds.isEmpty) {
       _showSnackBar('Please select at least one team member', Colors.red);
       return;
     }
@@ -131,11 +133,27 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
 
     // Create a single Task that contains the list of selected assignees
-    final assignees = adminCreate
-        ? List<String>.from(_selectedAssigneeIds)
-        : <String>[]; // non-admins don't assign users directly
-    // Try to resolve human-readable assignee names (optional)
+    List<String> assignees = [];
     final authService = Provider.of<AuthService>(context, listen: false);
+
+    if (adminCreate) {
+      if (_assignToAll) {
+        // Fetch all students
+        try {
+          final allUsers = await authService.getAllUsers();
+          assignees = allUsers
+              .where((u) => u.role != 'admin' && u.role != 'professor')
+              .map((u) => u.id)
+              .toList();
+        } catch (e) {
+          // print('Error fetching all users: $e');
+        }
+      } else {
+        assignees = List<String>.from(_selectedAssigneeIds);
+      }
+    }
+
+    // Try to resolve human-readable assignee names (optional)
     List<String>? assigneeNames;
     try {
       if (assignees.isNotEmpty) {
@@ -164,10 +182,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     // Professors: 'pending_approval' (needs admin review)
     // Others (if any): 'pending'
     String initialStatus = 'pending';
-    if (user?.role == 'admin') {
+    final userRole = user?.role.toLowerCase();
+    if (userRole == 'admin' || userRole == 'professor') {
       initialStatus = 'assigned';
-    } else if (user?.role == 'professor') {
-      initialStatus = 'pending_approval';
     }
 
     final newTask = app_models.Task(
@@ -274,16 +291,19 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 if (adminCreate) ...[
                   Row(
                     children: [
+                      // Assign to All Toggle
                       Transform.scale(
                         scale: 0.8,
                         child: Switch(
-                          value: _allowMultipleAssign,
+                          value: _assignToAll,
                           onChanged: (val) {
                             setState(() {
-                              _allowMultipleAssign = val;
-                              // Optional: Preserve selection if possible, otherwise clear
-                              // For now, clearing to avoid state mismatch issues as per previous logic
-                              _selectedAssigneeIds.clear();
+                              _assignToAll = val;
+                              if (val) {
+                                _selectedAssigneeIds.clear();
+                                _allowMultipleAssign =
+                                    false; // Disable specific selection
+                              }
                             });
                           },
                           activeThumbColor: Colors.white,
@@ -291,11 +311,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        _allowMultipleAssign
-                            ? 'Multiple Assign'
-                            : 'Single Assign',
-                        style: const TextStyle(
+                      const Text(
+                        'Assign to All Students',
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                           color: Colors.black87,
@@ -303,143 +321,179 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildLabel('Assign to'),
-
-                  if (snapshot.connectionState == ConnectionState.waiting) ...[
-                    const Center(child: CircularProgressIndicator()),
-                  ] else if (assignableUsers.isEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange[200]!),
-                      ),
-                      child: const Text(
-                        'No team members available to assign.',
-                        style: TextStyle(color: Colors.orange),
-                      ),
-                    ),
-                  ] else ...[
-                    if (_allowMultipleAssign) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: assignableUsers.isEmpty
-                            ? const Text('No users found')
-                            : Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: assignableUsers.map((user) {
-                                  final selected = _selectedAssigneeIds
-                                      .contains(user.id);
-                                  return FilterChip(
-                                    label: Text(user.name),
-                                    selected: selected,
-                                    onSelected: (val) {
-                                      setState(() {
-                                        if (val) {
-                                          _selectedAssigneeIds.add(user.id);
-                                        } else {
-                                          _selectedAssigneeIds.remove(user.id);
-                                        }
-                                      });
-                                    },
-                                    avatar: CircleAvatar(
-                                      backgroundImage:
-                                          (user.profileImage ?? '').isNotEmpty
-                                          ? NetworkImage(user.profileImage!)
-                                          : null,
-                                      child: (user.profileImage ?? '').isEmpty
-                                          ? Text(
-                                              user.name.isNotEmpty
-                                                  ? user.name[0]
-                                                  : '?',
-                                            )
-                                          : null,
-                                    ),
-                                    selectedColor: Colors.blue[100],
-                                    checkmarkColor: Colors.blue,
-                                  );
-                                }).toList(),
-                              ),
-                      ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: _selectedAssigneeIds.isNotEmpty
-                                ? _selectedAssigneeIds.first
-                                : null,
-                            hint: const Text('Select a team member'),
-                            icon: const Icon(Icons.arrow_drop_down),
-                            items: assignableUsers.map((user) {
-                              return DropdownMenuItem<String>(
-                                value: user.id,
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 12,
-                                      backgroundImage:
-                                          (user.profileImage ?? '').isNotEmpty
-                                          ? NetworkImage(user.profileImage!)
-                                          : null,
-                                      child: (user.profileImage ?? '').isEmpty
-                                          ? Text(
-                                              user.name.isNotEmpty
-                                                  ? user.name[0].toUpperCase()
-                                                  : '?',
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                              ),
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            user.name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (String? newValue) {
-                              if (newValue != null) {
-                                setState(() {
-                                  _selectedAssigneeIds
-                                    ..clear()
-                                    ..add(newValue);
-                                });
-                              }
+                  if (!_assignToAll) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Transform.scale(
+                          scale: 0.8,
+                          child: Switch(
+                            value: _allowMultipleAssign,
+                            onChanged: (val) {
+                              setState(() {
+                                _allowMultipleAssign = val;
+                                _selectedAssigneeIds.clear();
+                              });
                             },
+                            activeThumbColor: Colors.white,
+                            activeTrackColor: Colors.blue,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _allowMultipleAssign
+                              ? 'Multiple Assign'
+                              : 'Single Assign',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (!_assignToAll) ...[
+                    const SizedBox(height: 12),
+                    _buildLabel('Assign to'),
+                    if (snapshot.connectionState ==
+                        ConnectionState.waiting) ...[
+                      const Center(child: CircularProgressIndicator()),
+                    ] else if (assignableUsers.isEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange[200]!),
+                        ),
+                        child: const Text(
+                          'No team members available to assign.',
+                          style: TextStyle(color: Colors.orange),
+                        ),
                       ),
+                    ] else ...[
+                      if (_allowMultipleAssign) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: assignableUsers.isEmpty
+                              ? const Text('No users found')
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: assignableUsers.map((user) {
+                                    final selected = _selectedAssigneeIds
+                                        .contains(user.id);
+                                    return FilterChip(
+                                      label: Text(user.name),
+                                      selected: selected,
+                                      onSelected: (val) {
+                                        setState(() {
+                                          if (val) {
+                                            _selectedAssigneeIds.add(user.id);
+                                          } else {
+                                            _selectedAssigneeIds.remove(
+                                              user.id,
+                                            );
+                                          }
+                                        });
+                                      },
+                                      avatar: CircleAvatar(
+                                        backgroundImage:
+                                            (user.profileImage ?? '').isNotEmpty
+                                            ? NetworkImage(user.profileImage!)
+                                            : null,
+                                        child: (user.profileImage ?? '').isEmpty
+                                            ? Text(
+                                                user.name.isNotEmpty
+                                                    ? user.name[0]
+                                                    : '?',
+                                              )
+                                            : null,
+                                      ),
+                                      selectedColor: Colors.blue[100],
+                                      checkmarkColor: Colors.blue,
+                                    );
+                                  }).toList(),
+                                ),
+                        ),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _selectedAssigneeIds.isNotEmpty
+                                  ? _selectedAssigneeIds.first
+                                  : null,
+                              hint: const Text('Select a team member'),
+                              icon: const Icon(Icons.arrow_drop_down),
+                              items: assignableUsers.map((user) {
+                                return DropdownMenuItem<String>(
+                                  value: user.id,
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 12,
+                                        backgroundImage:
+                                            (user.profileImage ?? '').isNotEmpty
+                                            ? NetworkImage(user.profileImage!)
+                                            : null,
+                                        child: (user.profileImage ?? '').isEmpty
+                                            ? Text(
+                                                user.name.isNotEmpty
+                                                    ? user.name[0].toUpperCase()
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              user.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (String? newValue) {
+                                if (newValue != null) {
+                                  setState(() {
+                                    _selectedAssigneeIds
+                                      ..clear()
+                                      ..add(newValue);
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ] else ...[

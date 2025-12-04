@@ -23,11 +23,13 @@ class User {
     this.isBanned = false,
     this.notificationsEnabled,
     this.points = 0,
+    this.address,
   });
 
   final List<String>? enrolledCourseIds;
   final List<String>? teachingCourseIds;
   final String? phoneNumber;
+  final String? address;
   final bool isBanned;
   final bool? notificationsEnabled;
 
@@ -49,6 +51,7 @@ class User {
       isBanned: json['isBanned'] ?? false,
       notificationsEnabled: json['notificationsEnabled'] ?? true,
       points: json['points'] ?? 0,
+      address: json['address'],
     );
   }
 
@@ -63,6 +66,7 @@ class User {
       'enrolledCourseIds': enrolledCourseIds,
       'teachingCourseIds': teachingCourseIds,
       'phoneNumber': phoneNumber,
+      'address': address,
       'isBanned': isBanned,
       'notificationsEnabled': notificationsEnabled,
       'points': points,

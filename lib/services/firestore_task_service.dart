@@ -234,6 +234,27 @@ class FirestoreTaskService extends ChangeNotifier {
       'completionStatus': currentCompletionStatus,
     });
 
+    // Check if all assignees have been graded (or completed)
+    final assignees = List<String>.from(taskData['assignees'] ?? []);
+    bool allGraded = true;
+    if (assignees.isNotEmpty) {
+      for (var assignee in assignees) {
+        if (!currentGrades.containsKey(assignee)) {
+          allGraded = false;
+          break;
+        }
+      }
+    } else {
+      allGraded = true;
+    }
+
+    if (allGraded) {
+      await taskRef.update({
+        'status': 'approved',
+        'completedAt': FieldValue.serverTimestamp(),
+      });
+    }
+
     // Points awarding logic removed as per request
 
     notifyListeners();

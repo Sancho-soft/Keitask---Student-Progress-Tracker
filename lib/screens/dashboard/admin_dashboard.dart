@@ -152,68 +152,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  void _showResetLeaderboardDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Leaderboard'),
-        content: const Text(
-          'Are you sure you want to reset all student points to 0? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context); // Close dialog
-
-              // Show loading
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Resetting leaderboard...')),
-              );
-
-              try {
-                final firestore = Provider.of<FirestoreTaskService>(
-                  context,
-                  listen: false,
-                );
-                // We need to implement resetLeaderboard in FirestoreTaskService or do it here
-                // Doing it here for simplicity as it's an admin action
-                final usersRef = firestore.firestore.collection('users');
-                final students = await usersRef
-                    .where('role', isEqualTo: 'student')
-                    .get();
-
-                final batch = firestore.firestore.batch();
-                for (var doc in students.docs) {
-                  batch.update(doc.reference, {'points': 0});
-                }
-                await batch.commit();
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Leaderboard reset successfully'),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error resetting leaderboard: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Reset', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Use Provider to get the service instance
@@ -594,13 +532,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          FloatingActionButton(
-            heroTag: 'reset_leaderboard',
-            onPressed: () => _showResetLeaderboardDialog(context),
-            backgroundColor: Colors.red,
-            child: const Icon(Icons.refresh, color: Colors.white),
-          ),
-          const SizedBox(height: 16),
           FloatingActionButton(
             heroTag: 'broadcast',
             onPressed: () => _showBroadcastDialog(context),

@@ -1,8 +1,71 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_service.dart';
+import '../../services/firestore_task_service.dart';
 
 class LeaderboardScreen extends StatelessWidget {
   const LeaderboardScreen({super.key});
+
+  void _showResetLeaderboardDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Leaderboard'),
+        content: const Text(
+          'Are you sure you want to reset all student points to 0? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+
+              // Show loading
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Resetting leaderboard...')),
+              );
+
+              try {
+                final firestore = Provider.of<FirestoreTaskService>(
+                  context,
+                  listen: false,
+                );
+                final usersRef = firestore.firestore.collection('users');
+                final students = await usersRef
+                    .where('role', isEqualTo: 'student')
+                    .get();
+
+                final batch = firestore.firestore.batch();
+                for (var doc in students.docs) {
+                  batch.update(doc.reference, {'points': 0});
+                }
+                await batch.commit();
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Leaderboard reset successfully'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error resetting leaderboard: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Reset', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +79,20 @@ class LeaderboardScreen extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.transparent,
         centerTitle: true,
+        actions: [
+          Consumer<AuthService>(
+            builder: (context, auth, _) {
+              if (auth.appUser?.role == 'admin') {
+                return IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.red),
+                  onPressed: () => _showResetLeaderboardDialog(context),
+                  tooltip: 'Reset Leaderboard',
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance

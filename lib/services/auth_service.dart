@@ -329,6 +329,7 @@ class AuthService extends ChangeNotifier {
           profileImage: fbUser.photoURL,
           isApproved: true,
           isBanned: false,
+          address: null,
         );
         await _firestore.collection('users').doc(uid).set(newUser.toJson());
       }
@@ -367,6 +368,7 @@ class AuthService extends ChangeNotifier {
         profileImage: appUser!.profileImage,
         isApproved: true,
         phoneNumber: appUser!.phoneNumber,
+        address: appUser!.address,
         isBanned: appUser!.isBanned,
       );
       notifyListeners();
@@ -391,6 +393,7 @@ class AuthService extends ChangeNotifier {
         profileImage: appUser!.profileImage,
         isApproved: isApproved,
         phoneNumber: appUser!.phoneNumber,
+        address: appUser!.address,
         isBanned: appUser!.isBanned,
       );
       notifyListeners();
@@ -414,6 +417,7 @@ class AuthService extends ChangeNotifier {
           profileImage: appUser!.profileImage,
           isApproved: appUser!.isApproved,
           phoneNumber: appUser!.phoneNumber,
+          address: appUser!.address,
           isBanned: isBanned,
         );
         notifyListeners();
@@ -454,6 +458,7 @@ class AuthService extends ChangeNotifier {
           enrolledCourseIds: appUser!.enrolledCourseIds,
           teachingCourseIds: appUser!.teachingCourseIds,
           phoneNumber: appUser!.phoneNumber,
+          address: appUser!.address,
           isBanned: appUser!.isBanned,
           notificationsEnabled: enabled,
         );
@@ -477,6 +482,7 @@ class AuthService extends ChangeNotifier {
           profileImage: appUser!.profileImage,
           isApproved: appUser!.isApproved,
           phoneNumber: appUser!.phoneNumber,
+          address: appUser!.address,
           isBanned: appUser!.isBanned,
         );
         await _firestore.collection('users').doc(firebaseUser!.uid).update({
@@ -501,6 +507,7 @@ class AuthService extends ChangeNotifier {
           profileImage: imageUrl,
           isApproved: appUser!.isApproved,
           phoneNumber: appUser!.phoneNumber,
+          address: appUser!.address,
           isBanned: appUser!.isBanned,
         );
         await _firestore.collection('users').doc(firebaseUser!.uid).update({
@@ -525,10 +532,36 @@ class AuthService extends ChangeNotifier {
           profileImage: appUser!.profileImage,
           isApproved: appUser!.isApproved,
           phoneNumber: phoneNumber,
+          address: appUser!.address,
           isBanned: appUser!.isBanned,
         );
         await _firestore.collection('users').doc(firebaseUser!.uid).update({
           'phoneNumber': phoneNumber,
+        });
+        notifyListeners();
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Update user address
+  Future<void> updateUserAddress(String address) async {
+    try {
+      if (appUser != null) {
+        appUser = app_models.User(
+          id: appUser!.id,
+          email: appUser!.email,
+          name: appUser!.name,
+          role: appUser!.role,
+          profileImage: appUser!.profileImage,
+          isApproved: appUser!.isApproved,
+          phoneNumber: appUser!.phoneNumber,
+          address: address,
+          isBanned: appUser!.isBanned,
+        );
+        await _firestore.collection('users').doc(firebaseUser!.uid).update({
+          'address': address,
         });
         notifyListeners();
       }

@@ -2,9 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
-import '../../services/task_service.dart';
+
 import '../../services/firestore_task_service.dart';
 import '../../models/grade_model.dart';
+import '../../services/auth_service.dart';
 
 class AdminTasksApprovalScreen extends StatefulWidget {
   final User user;
@@ -20,6 +21,30 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
   String _filterStatus = 'all'; // Track filter state
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  final Map<String, User> _userCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    try {
+      final users = await authService.getAllUsers();
+      if (mounted) {
+        setState(() {
+          for (var user in users) {
+            _userCache[user.id] = user;
+          }
+        });
+      }
+    } catch (e) {
+      // print('Error fetching users: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -164,7 +189,6 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final taskService = Provider.of<TaskService>(context);
     final firestoreTaskService = Provider.of<FirestoreTaskService>(context);
 
     return Scaffold(
@@ -206,36 +230,28 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               children: [
-                GestureDetector(
-                  onTap: () => setState(() => _filterStatus = 'all'),
-                  child: _buildFilterChip(
-                    'All',
-                    isSelected: _filterStatus == 'all',
-                  ),
+                _buildFilterChip(
+                  'All',
+                  isSelected: _filterStatus == 'all',
+                  onSelected: () => setState(() => _filterStatus = 'all'),
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => setState(() => _filterStatus = 'pending'),
-                  child: _buildFilterChip(
-                    'Submissions',
-                    isSelected: _filterStatus == 'pending',
-                  ),
+                _buildFilterChip(
+                  'Submissions',
+                  isSelected: _filterStatus == 'pending',
+                  onSelected: () => setState(() => _filterStatus = 'pending'),
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => setState(() => _filterStatus = 'approvals'),
-                  child: _buildFilterChip(
-                    'Approvals',
-                    isSelected: _filterStatus == 'approvals',
-                  ),
+                _buildFilterChip(
+                  'Approvals',
+                  isSelected: _filterStatus == 'approvals',
+                  onSelected: () => setState(() => _filterStatus = 'approvals'),
                 ),
                 const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => setState(() => _filterStatus = 'completed'),
-                  child: _buildFilterChip(
-                    'Completed',
-                    isSelected: _filterStatus == 'completed',
-                  ),
+                _buildFilterChip(
+                  'Completed',
+                  isSelected: _filterStatus == 'completed',
+                  onSelected: () => setState(() => _filterStatus = 'completed'),
                 ),
               ],
             ),
@@ -320,7 +336,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                         ? task.assignees.first
                         : '';
                     final assigneeName = assigneeId.isNotEmpty
-                        ? taskService.getUserName(assigneeId)
+                        ? (_userCache[assigneeId]?.name ?? 'Loading...')
                         : '';
                     return _buildTaskReviewCard(
                       context,
@@ -338,7 +354,11 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, {required bool isSelected}) {
+  Widget _buildFilterChip(
+    String label, {
+    required bool isSelected,
+    required VoidCallback onSelected,
+  }) {
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
@@ -347,7 +367,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
         color: isSelected ? Colors.blue : Colors.black87,
         fontWeight: FontWeight.w500,
       ),
-      onSelected: (_) {}, // Handled by GestureDetector
+      onSelected: (_) => onSelected(),
       backgroundColor: Colors.grey[200],
     );
   }
@@ -383,13 +403,38 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              task.title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    task.title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha((0.1 * 255).round()),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(
@@ -504,26 +549,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  // Status Chip
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withAlpha((0.1 * 255).round()),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      statusText,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                  // Status Chip moved to top
 
                   // Rejection Reason (if rejected)
                   if (isRejected && task.rejectionReason != null) ...[
@@ -576,50 +602,42 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                         (!isPendingApproval && widget.user.role == 'professor'))
                       Row(
                         children: [
-                          // Approve Button
-                          SizedBox(
-                            height: 28,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (isPendingApproval) {
-                                  await firestoreTaskService
-                                      .approveProfessorTask(task.id);
-                                  if (!context.mounted) return;
-                                  _showFeedback(
-                                    context,
-                                    'Task Approved (Assigned).',
-                                  );
-                                } else {
-                                  await firestoreTaskService.approveTask(
-                                    task.id,
-                                  );
-                                  if (!context.mounted) return;
-                                  _showFeedback(
-                                    context,
-                                    'Task Approved (Completed).',
-                                  );
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
+                          // Approve Button (Only for Admin approving tasks, NOT for submissions)
+                          if (isPendingApproval)
+                            SizedBox(
+                              height: 28,
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  if (isPendingApproval) {
+                                    await firestoreTaskService
+                                        .approveProfessorTask(task.id);
+                                    if (!context.mounted) return;
+                                    _showFeedback(
+                                      context,
+                                      'Task Approved (Assigned).',
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  elevation: 0,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                'Approve',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                child: const Text(
+                                  'Approve',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
 
                           const SizedBox(width: 8),
                           // Grade Button (For Professors reviewing submissions)

@@ -227,6 +227,8 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   _buildInfoRow('Phone', displayUser.phoneNumber ?? 'Not set'),
                   const SizedBox(height: 14),
+                  _buildInfoRow('Address', displayUser.address ?? 'Not set'),
+                  const SizedBox(height: 14),
                   _buildInfoRow('Role', displayUser.role),
                   const SizedBox(height: 14),
                   _buildInfoRow(
@@ -339,6 +341,7 @@ class ProfileScreen extends StatelessWidget {
   void _showEditProfileDialog(BuildContext context) {
     final nameController = TextEditingController(text: user.name);
     final phoneController = TextEditingController(text: user.phoneNumber);
+    final addressController = TextEditingController(text: user.address);
     final emailController = TextEditingController(text: user.email);
     final roleController = TextEditingController(text: user.role.toUpperCase());
     bool isLoading = false;
@@ -468,6 +471,22 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  // Address
+                  TextField(
+                    controller: addressController,
+                    decoration: InputDecoration(
+                      label: const Text('Address'),
+                      hintText: 'Enter your address',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixIcon: const Icon(
+                        Icons.location_on,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   // Role display (read-only)
                   TextField(
                     controller: roleController,
@@ -531,6 +550,10 @@ class ProfileScreen extends StatelessWidget {
                           // Update phone number
                           await auth.updateUserPhone(
                             phoneController.text.trim(),
+                          );
+                          // Update address
+                          await auth.updateUserAddress(
+                            addressController.text.trim(),
                           );
 
                           if (imageUrl != null) {

@@ -210,84 +210,14 @@ class _TasksScreenState extends State<TasksScreen> {
                       if (task.submissions != null &&
                           task.submissions!.containsKey(effectiveUser!.id)) {
                         final urls = task.submissions![effectiveUser.id]!;
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('My Submission'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ...urls.map(
-                                  (url) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: InkWell(
-                                      onTap: () {
-                                        // In a real app, launch URL
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(content: Text('Link: $url')),
-                                        );
-                                      },
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.attachment,
-                                            size: 16,
-                                            color: Colors.blue,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              url.split('/').last,
-                                              style: const TextStyle(
-                                                color: Colors.blue,
-                                                decoration:
-                                                    TextDecoration.underline,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('No submission found.')),
-                        );
-                      }
-                    },
-                  ),
+                        final notes =
+                            task.submissionNotes != null &&
+                                task.submissionNotes!.containsKey(
+                                  effectiveUser.id,
+                                )
+                            ? task.submissionNotes![effectiveUser.id]
+                            : null;
 
-                // Action: View Submission (Students only, if submitted)
-                if (effectiveUser?.role != 'admin' &&
-                    effectiveUser?.role != 'professor' &&
-                    (statusLower == 'pending' ||
-                        statusLower == 'approved' ||
-                        statusLower == 'completed' ||
-                        statusLower == 'resubmitted'))
-                  ListTile(
-                    leading: const Icon(Icons.visibility, color: Colors.blue),
-                    title: const Text('View Submission'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Show submission details dialog
-                      if (task.submissions != null &&
-                          task.submissions!.containsKey(effectiveUser!.id)) {
-                        final urls = task.submissions![effectiveUser.id]!;
                         showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
@@ -332,6 +262,29 @@ class _TasksScreenState extends State<TasksScreen> {
                                     ),
                                   ),
                                 ),
+                                if (notes != null && notes.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'Notes:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      notes,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                             actions: [
@@ -395,10 +348,15 @@ class _TasksScreenState extends State<TasksScreen> {
                   leading: const Icon(Icons.edit, color: Colors.blue),
                   title: const Text('Edit Task'),
                   enabled:
+                      (effectiveUser?.role == 'admin' ||
+                          effectiveUser?.role == 'professor') &&
                       !(statusLower == 'approved' ||
                           statusLower == 'completed'),
                   onTap:
-                      (statusLower == 'approved' || statusLower == 'completed')
+                      (effectiveUser?.role != 'admin' &&
+                              effectiveUser?.role != 'professor') ||
+                          (statusLower == 'approved' ||
+                              statusLower == 'completed')
                       ? null
                       : () {
                           Navigator.pop(context);
@@ -775,7 +733,11 @@ class _TasksScreenState extends State<TasksScreen> {
     User? effectiveUser,
   ) {
     final bool isCompleted = task.status.toLowerCase() == 'completed';
-    final bool isApproved = task.status.toLowerCase() == 'approved';
+    final bool isApproved =
+        task.status.toLowerCase() == 'approved' ||
+        (effectiveUser != null &&
+            task.grades != null &&
+            task.grades!.containsKey(effectiveUser.id));
     final Color iconColor = isCompleted || isApproved
         ? Colors.green
         : Colors.blue;
@@ -873,6 +835,25 @@ class _TasksScreenState extends State<TasksScreen> {
                               color: Colors.blue,
                               size: 20,
                             ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              statusText,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       // Creator Name
@@ -895,25 +876,6 @@ class _TasksScreenState extends State<TasksScreen> {
                       // Status Badge & Deadline
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withAlpha(30),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              statusText,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: statusColor,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
                           Icon(
                             Icons.access_time,
                             size: 14,
