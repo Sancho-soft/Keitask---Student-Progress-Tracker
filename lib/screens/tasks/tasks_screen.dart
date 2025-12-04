@@ -194,6 +194,162 @@ class _TasksScreenState extends State<TasksScreen> {
                     },
                   ),
 
+                // Action: View Submission (Students only, if submitted)
+                if (effectiveUser?.role != 'admin' &&
+                    effectiveUser?.role != 'professor' &&
+                    (statusLower == 'pending' ||
+                        statusLower == 'approved' ||
+                        statusLower == 'completed' ||
+                        statusLower == 'resubmitted'))
+                  ListTile(
+                    leading: const Icon(Icons.visibility, color: Colors.blue),
+                    title: const Text('View Submission'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Show submission details dialog
+                      if (task.submissions != null &&
+                          task.submissions!.containsKey(effectiveUser!.id)) {
+                        final urls = task.submissions![effectiveUser.id]!;
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('My Submission'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ...urls.map(
+                                  (url) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: InkWell(
+                                      onTap: () {
+                                        // In a real app, launch URL
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(content: Text('Link: $url')),
+                                        );
+                                      },
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.attachment,
+                                            size: 16,
+                                            color: Colors.blue,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              url.split('/').last,
+                                              style: const TextStyle(
+                                                color: Colors.blue,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No submission found.')),
+                        );
+                      }
+                    },
+                  ),
+
+                // Action: View Submission (Students only, if submitted)
+                if (effectiveUser?.role != 'admin' &&
+                    effectiveUser?.role != 'professor' &&
+                    (statusLower == 'pending' ||
+                        statusLower == 'approved' ||
+                        statusLower == 'completed' ||
+                        statusLower == 'resubmitted'))
+                  ListTile(
+                    leading: const Icon(Icons.visibility, color: Colors.blue),
+                    title: const Text('View Submission'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Show submission details dialog
+                      if (task.submissions != null &&
+                          task.submissions!.containsKey(effectiveUser!.id)) {
+                        final urls = task.submissions![effectiveUser.id]!;
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('My Submission'),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ...urls.map(
+                                  (url) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: InkWell(
+                                      onTap: () {
+                                        // In a real app, launch URL
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(content: Text('Link: $url')),
+                                        );
+                                      },
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.attachment,
+                                            size: 16,
+                                            color: Colors.blue,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              url.split('/').last,
+                                              style: const TextStyle(
+                                                color: Colors.blue,
+                                                decoration:
+                                                    TextDecoration.underline,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No submission found.')),
+                        );
+                      }
+                    },
+                  ),
+
                 ListTile(
                   leading: const Icon(Icons.info_outline, color: Colors.blue),
                   title: const Text('View Details'),
@@ -961,11 +1117,28 @@ class _TasksScreenState extends State<TasksScreen> {
 
   String _formatDeadline(DateTime date) {
     final now = DateTime.now();
-    final diff = date.difference(now);
-    if (diff.isNegative) return 'Overdue';
-    if (diff.inDays > 0) return '${diff.inDays}d left';
-    if (diff.inHours > 0) return '${diff.inHours}h left';
-    return '${diff.inMinutes}m left';
+    final difference = date.difference(now);
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
+    final isTomorrow =
+        date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day + 1;
+
+    String timeStr =
+        '${date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour)}:${date.minute.toString().padLeft(2, '0')} ${date.hour >= 12 ? 'PM' : 'AM'}';
+
+    if (isToday) {
+      return 'Today at $timeStr';
+    } else if (isTomorrow) {
+      return 'Tomorrow at $timeStr';
+    } else if (difference.inDays < 7 && difference.inDays > 0) {
+      // Show day name
+      final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return '${days[date.weekday - 1]} at $timeStr';
+    } else {
+      return '${date.day}/${date.month}/${date.year} at $timeStr';
+    }
   }
 
   String _getMonthName(int month) {

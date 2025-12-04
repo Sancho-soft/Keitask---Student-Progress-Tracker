@@ -453,6 +453,49 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                 );
               }),
               const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
+
+            // Submission Notes (if any)
+            if (task.submissionNotes != null &&
+                task.assignees.isNotEmpty &&
+                task.submissionNotes!.containsKey(task.assignees.first)) ...[
+              const Text(
+                'Student Notes:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text(
+                  task.submissionNotes![task.assignees.first]!,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Submission Date
+            if (task.completionStatus != null &&
+                task.assignees.isNotEmpty &&
+                task.completionStatus!.containsKey(task.assignees.first)) ...[
+              Row(
+                children: [
+                  const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Submitted: ${_formatDate(task.completionStatus![task.assignees.first]!)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
             ],
 
             // Status and Notes Area (Matching Figma)
@@ -657,5 +700,20 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final isToday =
+        date.year == now.year && date.month == now.month && date.day == now.day;
+
+    String timeStr =
+        '${date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour)}:${date.minute.toString().padLeft(2, '0')} ${date.hour >= 12 ? 'PM' : 'AM'}';
+
+    if (isToday) {
+      return 'Today at $timeStr';
+    } else {
+      return '${date.day}/${date.month}/${date.year} at $timeStr';
+    }
   }
 }

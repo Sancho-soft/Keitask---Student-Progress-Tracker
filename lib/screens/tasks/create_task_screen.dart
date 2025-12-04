@@ -27,7 +27,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final _descriptionController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = const TimeOfDay(hour: 10, minute: 0);
+  TimeOfDay _selectedTime = TimeOfDay.now();
 
   final List<String> _selectedAssigneeIds = [];
   // Allow users to suggest assignees (when non-admin submits a pending task)

@@ -97,6 +97,7 @@ class Task {
   final List<String>? attachments; // List of file URLs
   final Map<String, DateTime>? completionStatus; // Map<UserId, CompletedAt>
   final Map<String, List<String>>? submissions; // Map<UserId, List<FileUrl>>
+  final Map<String, String>? submissionNotes; // Map<UserId, Note>
 
   Task({
     required this.id,
@@ -118,6 +119,7 @@ class Task {
     this.attachments,
     this.completionStatus,
     this.submissions,
+    this.submissionNotes,
   });
 
   factory Task.fromJson(Map<String, dynamic> json) {
@@ -173,6 +175,11 @@ class Task {
       });
     }
 
+    Map<String, String>? submissionNotesMap;
+    if (json['submissionNotes'] != null) {
+      submissionNotesMap = Map<String, String>.from(json['submissionNotes']);
+    }
+
     return Task(
       id: json['id'],
       title: json['title'],
@@ -203,6 +210,7 @@ class Task {
           : null,
       completionStatus: completionStatusMap,
       submissions: submissionsMap,
+      submissionNotes: submissionNotesMap,
     );
   }
 
@@ -229,6 +237,7 @@ class Task {
         (k, v) => MapEntry(k, v.toIso8601String()),
       ),
       'submissions': submissions,
+      'submissionNotes': submissionNotes,
     };
   }
 }

@@ -335,130 +335,133 @@ class _UserDashboardState extends State<UserDashboard> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Progress Overview (Matching Figma)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Progress Overview',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                  // Progress Overview (Matching Figma) - Hide for Professors
+                  if ((auth.appUser?.role ?? widget.user.role).toLowerCase() !=
+                      'professor') ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Progress Overview',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
                         ),
-                      ),
-                      // Blue Arrow Icon (tap to open progress detail)
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const ProgressDetailScreen(),
-                            ),
-                          );
-                        },
-                        child: const Icon(
-                          Icons.arrow_forward,
-                          size: 24,
-                          color: Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withAlpha(30),
-                          spreadRadius: 2,
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                        // Blue Arrow Icon (tap to open progress detail)
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ProgressDetailScreen(),
+                              ),
+                            );
+                          },
+                          child: const Icon(
+                            Icons.arrow_forward,
+                            size: 24,
+                            color: Colors.blue,
+                          ),
                         ),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Task Completion',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black87,
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withAlpha(30),
+                            spreadRadius: 2,
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Task Completion',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
                               ),
-                            ),
-                            Row(
-                              children: [
-                                Text(
-                                  '$completionPercentage%',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                              Row(
+                                children: [
+                                  Text(
+                                    '$completionPercentage%',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
                                   ),
+                                  const SizedBox(width: 4),
+                                  // Trend Icon (Matching Figma)
+                                  Icon(
+                                    completionPercentage >= 50
+                                        ? Icons.trending_up
+                                        : Icons.trending_down,
+                                    size: 16,
+                                    color: completionPercentage >= 50
+                                        ? Colors.green
+                                        : Colors.orange,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox(
+                              height: 12,
+                              child: LinearProgressIndicator(
+                                value: totalTasks > 0
+                                    ? completedCount / totalTasks
+                                    : 0,
+                                backgroundColor: Colors.grey[100],
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.blue,
                                 ),
-                                const SizedBox(width: 4),
-                                // Trend Icon (Matching Figma)
-                                Icon(
-                                  completionPercentage >= 50
-                                      ? Icons.trending_up
-                                      : Icons.trending_down,
-                                  size: 16,
-                                  color: completionPercentage >= 50
-                                      ? Colors.green
-                                      : Colors.orange,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            height: 12,
-                            child: LinearProgressIndicator(
-                              value: totalTasks > 0
-                                  ? completedCount / totalTasks
-                                  : 0,
-                              backgroundColor: Colors.grey[100],
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Colors.blue,
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '$completedCount of $totalTasks tasks completed',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '$completedCount of $totalTasks tasks completed',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
                               ),
-                            ),
-                            Text(
-                              '${totalTasks - completedCount} remaining',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
+                              Text(
+                                '${totalTasks - completedCount} remaining',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
+                  ],
 
                   // My Recent Tasks
                   Row(
