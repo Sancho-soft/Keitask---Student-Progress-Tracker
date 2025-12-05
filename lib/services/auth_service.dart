@@ -222,6 +222,7 @@ class AuthService extends ChangeNotifier {
     String role = 'user',
     File? profileImageFile,
     String? phoneNumber,
+    String? address,
   }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -247,6 +248,7 @@ class AuthService extends ChangeNotifier {
       profileImage: photoUrl,
       isApproved: role != 'professor', // Professors need approval
       phoneNumber: phoneNumber,
+      address: address,
     );
     await _firestore.collection('users').doc(uid).set(userRecord.toJson());
     appUser = userRecord;

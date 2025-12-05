@@ -172,7 +172,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     } else if (isProfessor) {
       screens = [
-        UserDashboard(user: widget.user),
+        UserDashboard(
+          user: widget.user,
+          onSeeAllTasks: () => _onTabSelected(1), // Switch to Tasks tab
+        ),
         AdminTasksApprovalScreen(
           user: widget.user,
         ), // Professors use this to approve/reject

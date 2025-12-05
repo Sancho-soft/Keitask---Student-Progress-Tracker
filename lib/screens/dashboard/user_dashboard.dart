@@ -11,8 +11,9 @@ import '../profile/progress_detail_screen.dart';
 
 class UserDashboard extends StatefulWidget {
   final User user;
+  final VoidCallback? onSeeAllTasks;
 
-  const UserDashboard({super.key, required this.user});
+  const UserDashboard({super.key, required this.user, this.onSeeAllTasks});
 
   @override
   State<UserDashboard> createState() => _UserDashboardState();
@@ -467,9 +468,13 @@ class _UserDashboardState extends State<UserDashboard> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'My Recent Tasks',
-                        style: TextStyle(
+                      Text(
+                        (auth.appUser?.role ?? widget.user.role)
+                                    .toLowerCase() ==
+                                'professor'
+                            ? 'Recent Submissions'
+                            : 'My Recent Tasks',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
@@ -477,11 +482,15 @@ class _UserDashboardState extends State<UserDashboard> {
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/tasks',
-                            arguments: widget.user,
-                          ).then((_) => _refresh());
+                          if (widget.onSeeAllTasks != null) {
+                            widget.onSeeAllTasks!();
+                          } else {
+                            Navigator.pushNamed(
+                              context,
+                              '/tasks',
+                              arguments: widget.user,
+                            ).then((_) => _refresh());
+                          }
                         },
                         child: const Text(
                           'See all',

@@ -113,6 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role: _selectedRole,
         profileImageFile: _profileImageFile,
         phoneNumber: _phoneController.text.trim(),
+        address: _addressController.text.trim(),
       );
       if (!mounted) return;
       if (user != null) {

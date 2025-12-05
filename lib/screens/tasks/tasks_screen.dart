@@ -344,30 +344,30 @@ class _TasksScreenState extends State<TasksScreen> {
                   },
                 ),
 
-                ListTile(
-                  leading: const Icon(Icons.edit, color: Colors.blue),
-                  title: const Text('Edit Task'),
-                  enabled:
-                      (effectiveUser?.role == 'admin' ||
-                          effectiveUser?.role == 'professor') &&
-                      !(statusLower == 'approved' ||
-                          statusLower == 'completed'),
-                  onTap:
-                      (effectiveUser?.role != 'admin' &&
-                              effectiveUser?.role != 'professor') ||
-                          (statusLower == 'approved' ||
-                              statusLower == 'completed')
-                      ? null
-                      : () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditTaskScreen(task: task),
-                            ),
-                          );
-                        },
-                ),
+                // Action: Edit Task (Admins/Professors only)
+                if (effectiveUser?.role == 'admin' ||
+                    effectiveUser?.role == 'professor')
+                  ListTile(
+                    leading: const Icon(Icons.edit, color: Colors.blue),
+                    title: const Text('Edit Task'),
+                    enabled:
+                        !(statusLower == 'approved' ||
+                            statusLower == 'completed'),
+                    onTap:
+                        (statusLower == 'approved' ||
+                            statusLower == 'completed')
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    EditTaskScreen(task: task),
+                              ),
+                            );
+                          },
+                  ),
 
                 // Action: Delete Task (Admins/Professors only)
                 if (effectiveUser?.role == 'admin' ||

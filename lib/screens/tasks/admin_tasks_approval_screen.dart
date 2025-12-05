@@ -243,12 +243,6 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                 ),
                 const SizedBox(width: 8),
                 _buildFilterChip(
-                  'Approvals',
-                  isSelected: _filterStatus == 'approvals',
-                  onSelected: () => setState(() => _filterStatus = 'approvals'),
-                ),
-                const SizedBox(width: 8),
-                _buildFilterChip(
                   'Completed',
                   isSelected: _filterStatus == 'completed',
                   onSelected: () => setState(() => _filterStatus = 'completed'),
@@ -299,12 +293,6 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                             t.status.toLowerCase() == 'resubmitted',
                       )
                       .toList();
-                } else if (_filterStatus == 'approvals') {
-                  filteredTasks = filteredTasks
-                      .where(
-                        (t) => t.status.toLowerCase() == 'pending_approval',
-                      )
-                      .toList();
                 } else if (_filterStatus == 'completed') {
                   filteredTasks = filteredTasks
                       .where(
@@ -320,9 +308,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                     child: Text(
                       _filterStatus == 'pending'
                           ? 'No pending submissions.'
-                          : (_filterStatus == 'approvals'
-                                ? 'No pending approvals.'
-                                : 'No tasks found.'),
+                          : 'No tasks found.',
                     ),
                   );
                 }
@@ -539,6 +525,51 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Grade Display (if graded)
+            if (task.grades != null &&
+                task.assignees.isNotEmpty &&
+                task.grades!.containsKey(task.assignees.first)) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.grade, size: 16, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Grade: ${task.grades![task.assignees.first]!.score}/${task.grades![task.assignees.first]!.maxScore}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (task.grades![task.assignees.first]!.comment != null &&
+                        task
+                            .grades![task.assignees.first]!
+                            .comment!
+                            .isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Note: ${task.grades![task.assignees.first]!.comment}',
+                        style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
             ],

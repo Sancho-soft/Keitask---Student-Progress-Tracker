@@ -252,9 +252,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('New task'),
-        actions: [
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-        ],
         elevation: 0,
       ),
       body: StreamBuilder<List<app_models.User>>(

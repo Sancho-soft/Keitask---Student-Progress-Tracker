@@ -190,27 +190,31 @@ class ProgressDetailScreen extends StatelessWidget {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 32.0),
-                        child: Column(
-                          children: const [
-                            Icon(
-                              Icons.check_circle_outline,
-                              size: 48,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 12),
-                            Text(
-                              'No tasks yet',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                            SizedBox(height: 6),
-                            Text(
-                              'Create your first task to get started',
-                              style: TextStyle(
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.check_circle_outline,
+                                size: 48,
                                 color: Colors.grey,
-                                fontSize: 12,
                               ),
-                            ),
-                          ],
+                              SizedBox(height: 12),
+                              Text(
+                                'No tasks yet',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Create your first task to get started',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )
