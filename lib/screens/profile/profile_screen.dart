@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import '../../services/report_service.dart';
 
 // We add a required callback function to handle navigation inside the Dashboard
 class ProfileScreen extends StatelessWidget {
@@ -33,12 +34,9 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: onBackToHome,
-        ),
         title: const Text('Profile'),
         elevation: 0,
+        automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -87,24 +85,6 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
-                      // Camera Icon Overlay
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 20,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -120,7 +100,9 @@ class ProfileScreen extends StatelessWidget {
                     ),
 
                     child: Text(
-                      user.role.toUpperCase(),
+                      (user.role == 'student' || user.role == 'user')
+                          ? 'STUDENT'
+                          : user.role.toUpperCase(),
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -134,70 +116,73 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // Completed summary (realtime)
-                  StreamBuilder<List<Task>>(
-                    stream: Provider.of<FirestoreTaskService>(
-                      context,
-                      listen: false,
-                    ).tasksStream(),
-                    builder: (context, snapshot) {
-                      final tasks = snapshot.data ?? [];
-                      final authInner = Provider.of<AuthService>(context);
-                      final effectiveUser = authInner.appUser ?? user;
-                      final completedCount = tasks
-                          .where(
-                            (t) =>
-                                t.assignees.contains(effectiveUser.id) &&
-                                t.status.toLowerCase() == 'completed',
-                          )
-                          .length;
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(230),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                ),
-                                const SizedBox(width: 8),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$completedCount',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.black87,
+                  // Completed summary (Only for Students)
+                  if (!user.role.toLowerCase().contains('admin') &&
+                      !user.role.toLowerCase().contains('professor'))
+                    StreamBuilder<List<Task>>(
+                      stream: Provider.of<FirestoreTaskService>(
+                        context,
+                        listen: false,
+                      ).tasksStream(),
+                      builder: (context, snapshot) {
+                        final tasks = snapshot.data ?? [];
+                        final authInner = Provider.of<AuthService>(context);
+                        final effectiveUser = authInner.appUser ?? user;
+                        final completedCount = tasks
+                            .where(
+                              (t) =>
+                                  t.assignees.contains(effectiveUser.id) &&
+                                  t.status.toLowerCase() == 'completed',
+                            )
+                            .length;
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(230),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$completedCount',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black87,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      'Completed',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey,
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Completed',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+                          ],
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
@@ -231,10 +216,7 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   _buildInfoRow('Role', displayUser.role),
                   const SizedBox(height: 14),
-                  _buildInfoRow(
-                    'Joined',
-                    _formatDate(DateTime.now()),
-                  ), // Mock data; replace with user.createdAt if available
+                  // _buildInfoRow('Joined', _formatDate(user.createdAt)), // Removed: createdAt missing in model
                   const SizedBox(height: 14),
                   Divider(color: Colors.grey[300]),
                   const SizedBox(height: 14),
@@ -299,6 +281,13 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () => _showSystemPreferencesDialog(context),
                   ),
                   const SizedBox(height: 12),
+                  // Report a Problem
+                  _buildSettingButton(
+                    icon: Icons.bug_report,
+                    label: 'Report a Problem',
+                    onTap: () => _showReportDialog(context),
+                  ),
+                  const SizedBox(height: 12),
                   // Rewards button removed as per request
                   const SizedBox(height: 12),
                   // Logout
@@ -318,23 +307,145 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Helper: Format date
-  String _formatDate(DateTime date) {
-    final months = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  // Helper: Show Report Dialog
+  void _showReportDialog(BuildContext context) {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    String selectedType = 'bug';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Report a Problem'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Please describe the issue you are facing. We will review it shortly.',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedType,
+                  onChanged: (value) => setState(() => selectedType = value!),
+                  items: const [
+                    DropdownMenuItem(value: 'bug', child: Text('Bug')),
+                    DropdownMenuItem(
+                      value: 'login_error',
+                      child: Text('Login Error'),
+                    ),
+                    DropdownMenuItem(value: 'other', child: Text('Other')),
+                  ],
+
+                  decoration: InputDecoration(
+                    label: const Text('Type'),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    label: const Text('Title'),
+                    hintText: 'Brief summary',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    label: const Text('Description'),
+                    hintText: 'Detailed explanation...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      if (titleController.text.trim().isEmpty ||
+                          descriptionController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please fill in all fields'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() => isLoading = true);
+                      try {
+                        final reportService = ReportService();
+                        // Assuming AuthService and User are available in closure or via context if not static
+                        // Using passed 'user' or context provider
+                        final authUser = Provider.of<AuthService>(
+                          context,
+                          listen: false,
+                        ).appUser;
+
+                        if (authUser != null) {
+                          await reportService.createReport(
+                            user: authUser,
+                            title: titleController.text.trim(),
+                            description: descriptionController.text.trim(),
+                            type: selectedType,
+                          );
+
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Report submitted successfully'),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error submitting report: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        setState(() => isLoading = false);
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Submit'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // Helper: Show feature coming soon
@@ -774,13 +885,10 @@ class ProfileScreen extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 16),
+
                 // Placeholder for future settings
-                SwitchListTile(
-                  title: const Text('Email Digest'),
-                  subtitle: const Text('Weekly email summary (Coming Soon)'),
-                  value: false,
-                  onChanged: null, // Disabled
-                ),
+                // Placeholder for future settings
+                // Email Digest removed
               ],
             ),
           ),

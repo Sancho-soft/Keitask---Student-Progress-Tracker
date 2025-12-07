@@ -45,16 +45,36 @@ class _UserDashboardState extends State<UserDashboard> {
             )
             .toList();
 
-        final approvedCount = userTasks
-            .where((t) => t.status.toLowerCase() == 'approved')
-            .length;
-        final pendingCount = userTasks
-            .where(
-              (t) =>
-                  t.status.toLowerCase() == 'pending' ||
-                  t.status.toLowerCase() == 'assigned',
-            )
-            .length;
+        // 1. Assigned: assigned to user, not submitted, not completed
+        final assignedCount = userTasks.where((t) {
+          final hasSubmitted =
+              t.submissions?.containsKey(currentUserId) ?? false;
+          final isCompleted =
+              t.completionStatus?.containsKey(currentUserId) ?? false;
+          final isGlobalCompleted =
+              t.status.toLowerCase() == 'completed' ||
+              t.status.toLowerCase() == 'approved';
+          return !hasSubmitted &&
+              !isCompleted &&
+              !isGlobalCompleted &&
+              t.status.toLowerCase() != 'rejected';
+        }).length;
+
+        // 2. Pending Approval: submitted but not completed
+        final pendingApprovalCount = userTasks.where((t) {
+          final hasSubmitted =
+              t.submissions?.containsKey(currentUserId) ?? false;
+          final isCompleted =
+              t.completionStatus?.containsKey(currentUserId) ?? false;
+          final isGlobalCompleted =
+              t.status.toLowerCase() == 'completed' ||
+              t.status.toLowerCase() == 'approved';
+          return hasSubmitted &&
+              !isCompleted &&
+              !isGlobalCompleted &&
+              t.status.toLowerCase() != 'rejected';
+        }).length;
+
         final rejectedCount = userTasks
             .where((t) => t.status.toLowerCase() == 'rejected')
             .length;
@@ -65,14 +85,22 @@ class _UserDashboardState extends State<UserDashboard> {
                   t.status.toLowerCase() == 'resubmit',
             )
             .length;
-        // Completed should reflect only fully completed tasks (not just approved)
-        final completedCount = userTasks
-            .where((t) => t.status.toLowerCase() == 'completed')
-            .length;
+
+        // 3. Completed: marked completed per user or globally
+        final completedCount = userTasks.where((t) {
+          final isCompleted =
+              t.completionStatus?.containsKey(currentUserId) ?? false;
+          final isGlobalCompleted =
+              t.status.toLowerCase() == 'completed' ||
+              t.status.toLowerCase() == 'approved';
+          return isCompleted || isGlobalCompleted;
+        }).length;
+
         final totalTasks = userTasks.length;
         final completionPercentage = totalTasks > 0
             ? ((completedCount / totalTasks) * 100).round()
             : 0;
+
         userTasks.sort(
           (a, b) => (b.completedAt ?? b.dueDate).compareTo(
             a.completedAt ?? a.dueDate,
@@ -131,7 +159,7 @@ class _UserDashboardState extends State<UserDashboard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Hi, ${(auth.appUser?.name ?? widget.user.name).toLowerCase()}!',
+                                'Hi, ${(auth.appUser?.name ?? widget.user.name)}!',
                                 style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -234,20 +262,31 @@ class _UserDashboardState extends State<UserDashboard> {
                     childAspectRatio:
                         1.25, // Adjusted to 1.25 to prevent overflow
                     children: [
+                      // Assigned (Blue)
                       _buildStatCard(
-                        'Approved',
-                        '$approvedCount',
+                        'Assigned',
+                        '$assignedCount',
+                        const Color(0xFFE3F2FD),
+                        Colors.blue,
+                        Icons.assignment,
+                      ),
+                      // Pending Approval (Orange)
+                      _buildStatCard(
+                        'Pending Approval',
+                        '$pendingApprovalCount',
+                        const Color(0xFFFFF3E0),
+                        Colors.orange,
+                        Icons.hourglass_empty,
+                      ),
+                      // Completed (Green)
+                      _buildStatCard(
+                        'Completed',
+                        '$completedCount',
                         const Color(0xFFE8F5E9),
                         Colors.green,
                         Icons.check_circle,
                       ),
-                      _buildStatCard(
-                        'Pending',
-                        '$pendingCount',
-                        const Color(0xFFFFF3E0),
-                        Colors.orange,
-                        Icons.schedule,
-                      ),
+
                       GestureDetector(
                         onTap: () {
                           // Show rejection reasons for user's rejected tasks
@@ -325,6 +364,7 @@ class _UserDashboardState extends State<UserDashboard> {
                           Icons.cancel,
                         ),
                       ),
+                      // Resubmitted (Purple)
                       _buildStatCard(
                         'Resubmitted',
                         '$resubmittedCount',

@@ -13,7 +13,7 @@ import 'admin_dashboard.dart';
 import 'user_dashboard.dart';
 import '../tasks/admin_tasks_approval_screen.dart';
 import '../admin/users_screen.dart';
-import '../admin/task_statistics_screen.dart';
+// import '../admin/task_statistics_screen.dart'; // Removed
 import '../leaderboard/leaderboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -180,14 +180,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           user: widget.user,
         ), // Professors use this to approve/reject
         const SizedBox(), // Placeholder for "New Task" (handled in _onTabSelected)
-        const TaskStatisticsScreen(showBackButton: false),
+        const LeaderboardScreen(), // Professor Leaderboard (was Analytics)
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),
       ];
       navItems = [
         const CircularNavBarItem(icon: Icons.home, label: 'Home'),
         const CircularNavBarItem(icon: Icons.task, label: 'Tasks'),
         const CircularNavBarItem(icon: Icons.add_circle, label: 'New Task'),
-        const CircularNavBarItem(icon: Icons.analytics, label: 'Analytics'),
+        const CircularNavBarItem(icon: Icons.leaderboard, label: 'Rank'),
         const CircularNavBarItem(icon: Icons.person, label: 'Profile'),
       ];
     } else {

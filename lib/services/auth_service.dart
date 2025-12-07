@@ -98,7 +98,9 @@ class AuthService extends ChangeNotifier {
           role: 'user',
           isApproved: true,
         );
-        await _firestore.collection('users').doc(uid).set(u.toJson());
+        final userData = u.toJson();
+        userData['createdAt'] = FieldValue.serverTimestamp(); // Add timestamp
+        await _firestore.collection('users').doc(uid).set(userData);
         appUser = u;
       }
 
@@ -250,7 +252,11 @@ class AuthService extends ChangeNotifier {
       phoneNumber: phoneNumber,
       address: address,
     );
-    await _firestore.collection('users').doc(uid).set(userRecord.toJson());
+
+    final userData = userRecord.toJson();
+    userData['createdAt'] = FieldValue.serverTimestamp(); // Add timestamp
+
+    await _firestore.collection('users').doc(uid).set(userData);
     appUser = userRecord;
     notifyListeners();
     return appUser;

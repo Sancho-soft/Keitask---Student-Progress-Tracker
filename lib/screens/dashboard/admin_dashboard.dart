@@ -1,14 +1,16 @@
-// lib/screens/auth/dashboard/admin_dashboard.dart (UPDATED WITH REJECTION REASON)
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/user_model.dart';
-import '../../services/task_service.dart';
-import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_notification_service.dart';
-import '../admin/task_statistics_screen.dart';
+import '../../services/firestore_task_service.dart';
+import '../../models/user_model.dart'
+    as app_models; // Alias to avoid conflict if needed, though Task is in separate file usually.
+// Actually Task is in user_model.dart?? No, I saw it there. Yes, Task class is in user_model.dart.
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import '../admin/admin_reports_screen.dart'; // Reports Inbox
 
 class AdminDashboard extends StatefulWidget {
   final User user;
@@ -20,71 +22,6 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  void _refresh() {
-    // Provider handles updates automatically.
-  }
-
-  void _showRejectDialog(
-    BuildContext context,
-    String taskId,
-    FirestoreTaskService firestoreTaskService,
-  ) {
-    final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Task'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Please provide a reason for rejection:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              decoration: InputDecoration(
-                hintText: 'Enter rejection reason...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a rejection reason'),
-                  ),
-                );
-                return;
-              }
-              firestoreTaskService.rejectTask(taskId, reason);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Task rejected with reason: $reason')),
-              );
-            },
-            child: const Text('Reject', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showBroadcastDialog(BuildContext context) {
     final titleController = TextEditingController();
     final bodyController = TextEditingController();
@@ -154,43 +91,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Use Provider to get the service instance
-    final taskService = Provider.of<TaskService>(context);
-    final firestoreTaskService = Provider.of<FirestoreTaskService>(context);
-    final auth = Provider.of<AuthService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context);
 
-    // Stream tasks and derive counts from Firestore to ensure accuracy
+    // Stream users to calculate stats
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: StreamBuilder<List<Task>>(
-        stream: firestoreTaskService.tasksStream(),
+      body: StreamBuilder<List<User>>(
+        stream: authService.usersStream(),
         builder: (context, snapshot) {
-          final allTasks = snapshot.data ?? [];
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-          final approvedCount = allTasks
-              .where((t) => t.status.toLowerCase() == 'approved')
-              .length;
-          final pendingCount = allTasks
-              .where((t) => t.status.toLowerCase() == 'pending')
-              .length;
-          final rejectedCount = allTasks
-              .where((t) => t.status.toLowerCase() == 'rejected')
-              .length;
-          final resubmittedCount = allTasks
-              .where(
-                (t) =>
-                    t.status.toLowerCase() == 'resubmitted' ||
-                    t.status.toLowerCase() == 'resubmit',
-              )
-              .length;
+          final users = snapshot.data ?? [];
 
-          final pendingTasksReviews = allTasks
-              .where(
-                (task) =>
-                    task.status.toLowerCase() == 'pending' ||
-                    task.status.toLowerCase() == 'resubmitted',
-              )
-              .toList();
+          final totalUsers = users.length;
+          final totalStudents = users
+              .where((u) => u.role == 'student' || u.role == 'user')
+              .length;
+          final totalProfessors = users
+              .where((u) => u.role == 'professor' && u.isApproved)
+              .length;
+          final pendingApprovals = users
+              .where((u) => u.role == 'professor' && !u.isApproved)
+              .length;
 
           return SafeArea(
             child: SingleChildScrollView(
@@ -212,7 +136,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Hi, ${auth.appUser?.name ?? widget.user.name}!',
+                                'Hi, ${widget.user.name}!',
                                 style: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -221,7 +145,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               ),
                               const SizedBox(height: 4),
                               const Text(
-                                'Track your progress below.',
+                                'Overview of system users.',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.white70,
@@ -230,295 +154,196 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             ],
                           ),
                         ),
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: Colors.white,
-                          backgroundImage:
-                              (auth.appUser?.profileImage != null &&
-                                  auth.appUser!.profileImage!.isNotEmpty)
-                              ? NetworkImage(auth.appUser!.profileImage!)
-                                    as ImageProvider
-                              : null,
-                          child:
-                              (auth.appUser == null ||
-                                  auth.appUser!.profileImage == null ||
-                                  auth.appUser!.profileImage!.isEmpty)
-                              ? Text(
-                                  widget.user.name.isNotEmpty
-                                      ? widget.user.name[0].toUpperCase()
-                                      : 'A',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.inbox,
+                                color: Colors.white,
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AdminReportsScreen(),
                                   ),
-                                )
-                              : null,
+                                );
+                              },
+                              tooltip: 'Reports Inbox',
+                            ),
+                            const SizedBox(width: 8),
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: Colors.white,
+                              backgroundImage:
+                                  (widget.user.profileImage != null &&
+                                      widget.user.profileImage!.isNotEmpty)
+                                  ? NetworkImage(widget.user.profileImage!)
+                                        as ImageProvider
+                                  : null,
+                              child:
+                                  (widget.user.profileImage == null ||
+                                      widget.user.profileImage!.isEmpty)
+                                  ? Text(
+                                      widget.user.name.isNotEmpty
+                                          ? widget.user.name[0].toUpperCase()
+                                          : 'A',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
+
                   // Content Section
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Status Cards Grid (2x2) - OVERFLOW FIX APPLIED HERE
+                        // Stats Cards Grid (2x2)
                         GridView.count(
                           crossAxisCount: 2,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          childAspectRatio:
-                              1.5, // FIX: This resolves the overflow
+                          childAspectRatio: 1.5,
                           children: [
                             _buildStatCard(
-                              'Approved',
-                              '$approvedCount',
+                              'Total Users',
+                              '$totalUsers',
+                              Colors.blue[50]!,
+                              Colors.blue,
+                              Icons.people,
+                            ),
+                            _buildStatCard(
+                              'Total Students',
+                              '$totalStudents',
                               const Color(0xFFE8F5E9),
                               Colors.green,
-                              Icons.check_circle,
+                              Icons.school,
                             ),
                             _buildStatCard(
-                              'Pending',
-                              '$pendingCount',
-                              const Color(0xFFFFF3E0),
-                              Colors.orange,
-                              Icons.schedule,
-                            ),
-                            _buildStatCard(
-                              'Rejected',
-                              '$rejectedCount',
-                              const Color(0xFFFFEBEE),
-                              Colors.red,
-                              Icons.cancel,
-                            ),
-                            _buildStatCard(
-                              'Resubmitted',
-                              '$resubmittedCount',
+                              'Active Professors',
+                              '$totalProfessors',
                               const Color(0xFFF3E5F5),
                               Colors.purple,
-                              Icons.refresh,
+                              Icons.person_outline,
+                            ),
+                            _buildStatCard(
+                              'Pending Approvals',
+                              '$pendingApprovals',
+                              const Color(0xFFFFF3E0),
+                              Colors.orange,
+                              Icons.pending_actions,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
 
-                        // Pending Tasks Reviews Section
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Pending Tasks Reviews',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                  // Analytics Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Analytics',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // User Growth Chart
+                        Container(
+                          height: 300,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(10),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                // Navigates to the dedicated approval screen (Tasks tab)
-                                // Note: AdminTasksApprovalScreen uses this same data source.
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const TaskStatisticsScreen(),
-                                  ),
-                                ).then((_) => _refresh());
-                              },
-                              child: const Text(
-                                'See all',
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'User Growth',
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 24),
+                              Expanded(child: _buildUserGrowthChart(users)),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        pendingTasksReviews.isEmpty
-                            ? Center(
-                                child: Container(
-                                  padding: const EdgeInsets.all(24),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[50],
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.task_alt,
-                                        size: 48,
-                                        color: Colors.grey[400],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'No pending reviews',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[600],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'All tasks have been reviewed',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[500],
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: pendingTasksReviews.length,
-                                itemBuilder: (context, index) {
-                                  final task = pendingTasksReviews[index];
-                                  final assigneeId = task.assignees.isNotEmpty
-                                      ? task.assignees.first
-                                      : '';
-                                  final assigneeName = assigneeId.isNotEmpty
-                                      ? taskService.getUserName(assigneeId)
-                                      : '';
 
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        color: Colors.white,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.grey.withAlpha(
-                                              (0.1 * 255).round(),
-                                            ),
-                                            spreadRadius: 1,
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      padding: const EdgeInsets.all(16),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  task.title,
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Colors.black87,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'by $assigneeName', // Now displays name
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.grey,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.visibility,
-                                              color: Colors.blue,
-                                            ),
-                                            onPressed: () {
-                                              // View task details
-                                              showDialog(
-                                                context: context,
-                                                builder: (context) => AlertDialog(
-                                                  title: Text(task.title),
-                                                  content: Column(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        'Description: ${task.description}',
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      Text(
-                                                        'Assignee: $assigneeName',
-                                                      ),
-                                                      const SizedBox(height: 8),
-                                                      Text(
-                                                        'Due Date: ${_formatDate(task.dueDate)}',
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  actions: [
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        Navigator.pop(context);
-                                                        _showRejectDialog(
-                                                          context,
-                                                          task.id,
-                                                          firestoreTaskService,
-                                                        );
-                                                      },
-                                                      child: const Text(
-                                                        'Reject',
-                                                        style: TextStyle(
-                                                          color: Colors.red,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    TextButton(
-                                                      onPressed: () {
-                                                        // Use the FirestoreTaskService method
-                                                        firestoreTaskService
-                                                            .approveTask(
-                                                              task.id,
-                                                            );
-                                                        Navigator.pop(context);
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              'Task approved',
-                                                            ),
-                                                          ),
-                                                        );
-                                                      },
-                                                      child: const Text(
-                                                        'Approve',
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
+                        const SizedBox(height: 16),
+
+                        // Task Status Chart
+                        StreamBuilder<List<app_models.Task>>(
+                          stream: Provider.of<FirestoreTaskService>(
+                            context,
+                            listen: false,
+                          ).tasksStream(),
+                          builder: (context, taskSnapshot) {
+                            if (!taskSnapshot.hasData) {
+                              return const SizedBox.shrink();
+                            }
+                            final tasks = taskSnapshot.data!;
+                            return Container(
+                              height: 300,
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(10),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Task Distribution',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Expanded(child: _buildTaskStatusChart(tasks)),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 80), // Bottom padding
                       ],
                     ),
                   ),
@@ -581,9 +406,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 title,
                 style: const TextStyle(
                   fontSize: 10,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
+                  color: Colors.grey, // Adjusted primarily for readability
+                  fontWeight: FontWeight.w600, // Slightly bolder for small text
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
@@ -601,21 +428,216 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  Widget _buildUserGrowthChart(List<User> users) {
+    if (users.isEmpty) return const Center(child: Text('No user data'));
+
+    final validUsers = users.where((u) => u.createdAt != null).toList();
+
+    if (validUsers.isEmpty && users.isNotEmpty) {
+      return Center(
+        child: Text('Total Users: ${users.length} (No timeline data)'),
+      );
+    } else if (validUsers.isEmpty) {
+      return const Center(child: Text('No user data'));
+    }
+
+    validUsers.sort((a, b) => a.createdAt!.compareTo(b.createdAt!));
+
+    final Map<int, int> growthMap = {};
+    int count = (users.length - validUsers.length);
+
+    for (var user in validUsers) {
+      count++;
+      final date = user.createdAt!;
+      final dayKey = DateTime(
+        date.year,
+        date.month,
+        date.day,
+      ).millisecondsSinceEpoch;
+      growthMap[dayKey] = count;
+    }
+
+    final sortedKeys = growthMap.keys.toList()..sort();
+
+    final spots = sortedKeys.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), growthMap[e.value]!.toDouble());
+    }).toList();
+
+    return LineChart(
+      LineChartData(
+        gridData: const FlGridData(show: false),
+        titlesData: FlTitlesData(
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index >= 0 && index < sortedKeys.length) {
+                  final totalPoints = sortedKeys.length;
+                  // Show ~5 labels
+                  final interval = (totalPoints / 5).ceil();
+
+                  if (index % interval == 0 || index == totalPoints - 1) {
+                    final dateMs = sortedKeys[index];
+                    final date = DateTime.fromMillisecondsSinceEpoch(dateMs);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        DateFormat('MM/dd').format(date),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    );
+                  }
+                }
+                return const SizedBox();
+              },
+              reservedSize: 30,
+            ),
+          ),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        minX: 0,
+        maxX: (sortedKeys.length - 1).toDouble(),
+        minY: 0,
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            color: Colors.blue,
+            barWidth: 3,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: Colors.blue.withAlpha(40),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskStatusChart(List<app_models.Task> tasks) {
+    if (tasks.isEmpty) return const Center(child: Text('No tasks created yet'));
+
+    final completed = tasks
+        .where(
+          (t) =>
+              t.status.toLowerCase() == 'completed' ||
+              t.status.toLowerCase() == 'approved',
+        )
+        .length;
+    final pending = tasks
+        .where(
+          (t) =>
+              t.status.toLowerCase() == 'pending' ||
+              t.status.toLowerCase() == 'submitted' ||
+              t.status.toLowerCase() == 'assigned',
+        )
+        .length;
+    final rejected = tasks
+        .where((t) => t.status.toLowerCase() == 'rejected')
+        .length;
+
+    if (completed == 0 && pending == 0 && rejected == 0) {
+      return const Center(child: Text('No active task data'));
+    }
+
+    final total = tasks.length;
+
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 200,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 40,
+                sections: [
+                  if (completed > 0)
+                    PieChartSectionData(
+                      color: Colors.green,
+                      value: completed.toDouble(),
+                      title:
+                          '${((completed / total) * 100).toStringAsFixed(0)}%',
+                      radius: 40,
+                      titleStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  if (pending > 0)
+                    PieChartSectionData(
+                      color: Colors.orange,
+                      value: pending.toDouble(),
+                      title: '${((pending / total) * 100).toStringAsFixed(0)}%',
+                      radius: 40,
+                      titleStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  if (rejected > 0)
+                    PieChartSectionData(
+                      color: Colors.red,
+                      value: rejected.toDouble(),
+                      title:
+                          '${((rejected / total) * 100).toStringAsFixed(0)}%',
+                      radius: 40,
+                      titleStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLegendItem('Completed', Colors.green, completed),
+            const SizedBox(height: 8),
+            _buildLegendItem('Pending', Colors.orange, pending),
+            const SizedBox(height: 8),
+            _buildLegendItem('Rejected', Colors.red, rejected),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendItem(String title, Color color, int count) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        Text('$title: $count', style: const TextStyle(fontSize: 12)),
+      ],
+    );
   }
 }

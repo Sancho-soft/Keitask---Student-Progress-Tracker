@@ -9,6 +9,7 @@ class User {
   final String? profileImage;
   final int points;
   final bool isApproved;
+  final DateTime? createdAt;
 
   User({
     required this.id,
@@ -24,6 +25,7 @@ class User {
     this.notificationsEnabled,
     this.points = 0,
     this.address,
+    this.createdAt,
   });
 
   final List<String>? enrolledCourseIds;
@@ -52,6 +54,9 @@ class User {
       notificationsEnabled: json['notificationsEnabled'] ?? true,
       points: json['points'] ?? 0,
       address: json['address'],
+      createdAt: json['createdAt'] != null
+          ? (json['createdAt'] as dynamic).toDate()
+          : null,
     );
   }
 
@@ -70,6 +75,7 @@ class User {
       'isBanned': isBanned,
       'notificationsEnabled': notificationsEnabled,
       'points': points,
+      'createdAt': createdAt,
     };
   }
 }

@@ -1,10 +1,8 @@
-// keitask_management/lib/screens/auth/register_screen.dart (MODIFIED)
+// keitask_management/lib/screens/auth/register_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../../services/auth_service.dart';
 import 'email_verification_screen.dart';
 
@@ -16,67 +14,62 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  int _currentStep = 0;
-
-  // Step 1: Personal Information
+  // Controllers
   final _nameController = TextEditingController();
   final _birthdayController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
-  String _selectedRole = 'student'; // Default role
-
-  // Step 2: Email
   final _emailController = TextEditingController();
-
-  // Step 3: Password
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  String _selectedRole = 'student'; // Default role
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
-
   bool _isLoading = false;
-  File? _profileImageFile;
-  bool _isPickingImage = false;
 
-  // --- VALIDATION AND NAVIGATION ---
-
-  bool _validateCurrentStep() {
-    switch (_currentStep) {
-      case 0: // Personal Info
-        if (_nameController.text.trim().isEmpty ||
-            _birthdayController.text.trim().isEmpty) {
-          _showSnackBar('Please fill in Name and Birthday.');
-          return false;
-        }
-        return true;
-      case 1: // Email
-        if (!_emailController.text.contains('@') ||
-            _emailController.text.trim().length < 5) {
-          _showSnackBar('Please enter a valid email address.');
-          return false;
-        }
-        return true;
-      case 2: // Password
-        if (_passwordController.text.length < 6) {
-          _showSnackBar('Password must be at least 6 characters.');
-          return false;
-        }
-        if (_passwordController.text != _confirmPasswordController.text) {
-          _showSnackBar('Passwords do not match.');
-          return false;
-        }
-        if (!_agreeToTerms) {
-          _showSnackBar('You must agree to the Terms and Conditions.');
-          return false;
-        }
-        return true;
-      case 3: // Photo (optional)
-        // Photo step is optional — allow skipping or continuing with/without photo
-        return true;
-      default:
-        return true;
+  // Validation
+  bool _validateInput() {
+    if (_nameController.text.trim().isEmpty) {
+      _showSnackBar('Please enter your name.');
+      return false;
     }
+    if (_birthdayController.text.trim().isEmpty) {
+      _showSnackBar('Please select your birthday.');
+      return false;
+    }
+    if (_addressController.text.trim().isEmpty) {
+      _showSnackBar('Please enter your address.');
+      return false;
+    }
+    if (_phoneController.text.trim().isEmpty) {
+      _showSnackBar('Please enter your phone number.');
+      return false;
+    }
+    // Phone number validation: Digits only
+    if (!RegExp(r'^[0-9]+$').hasMatch(_phoneController.text.trim())) {
+      _showSnackBar('Phone number must contain only digits.');
+      return false;
+    }
+    if (!_emailController.text.contains('@') ||
+        _emailController.text.trim().length < 5) {
+      _showSnackBar('Please enter a valid email address.');
+      return false;
+    }
+    if (_passwordController.text.length < 6) {
+      _showSnackBar('Password must be at least 6 characters.');
+      return false;
+    }
+    if (_passwordController.text != _confirmPasswordController.text) {
+      _showSnackBar('Passwords do not match.');
+      return false;
+    }
+    if (!_agreeToTerms) {
+      _showSnackBar('You must agree to the Terms and Conditions.');
+      return false;
+    }
+    return true;
   }
 
   void _showSnackBar(String message) {
@@ -86,22 +79,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
-    if (!_validateCurrentStep()) return;
+    if (!_validateInput()) return;
 
     setState(() => _isLoading = true);
     try {
       final auth = Provider.of<AuthService>(context, listen: false);
 
-      // Check if AuthService detected an init error
       if (auth.initError != null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Firebase error: ${auth.initError}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        _showSnackBar('Firebase error: ${auth.initError}');
         setState(() => _isLoading = false);
         return;
       }
@@ -111,10 +97,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         role: _selectedRole,
-        profileImageFile: _profileImageFile,
+        profileImageFile: null, // Removed PFP upload
         phoneNumber: _phoneController.text.trim(),
         address: _addressController.text.trim(),
       );
+
       if (!mounted) return;
       if (user != null) {
         if (_selectedRole == 'professor') {
@@ -130,10 +117,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               actions: [
                 TextButton(
                   onPressed: () async {
-                    Navigator.pop(dialogContext); // Close dialog
-                    await auth.signOut(); // Sign out immediately
+                    Navigator.pop(dialogContext);
+                    await auth.signOut();
                     if (!mounted) return;
-                    // Clear stack and go to Login
                     Navigator.of(
                       context,
                     ).pushNamedAndRemoveUntil('/', (route) => false);
@@ -152,22 +138,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Registration failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar('Registration failed. Please try again.');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Registration error: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+      _showSnackBar('Registration error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -184,37 +159,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           context,
         ).pushReplacementNamed('/dashboard', arguments: user);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google sign-in failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showSnackBar('Google sign-in failed');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Google sign-in error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnackBar('Google sign-in error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _nextStep() {
-    if (!_validateCurrentStep()) return;
-
-    if (_currentStep < 3) {
-      setState(() => _currentStep++);
-    }
-  }
-
-  void _previousStep() {
-    if (_currentStep > 0) {
-      setState(() => _currentStep--);
     }
   }
 
@@ -230,29 +181,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _pickProfileImage() async {
-    if (_isPickingImage) return; // prevent re-entrancy
-    _isPickingImage = true;
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 800,
-      );
-      if (picked != null && mounted) {
-        setState(() => _profileImageFile = File(picked.path));
-      }
-    } on Exception catch (e) {
-      // Surface a friendly message using a captured messenger
-      messenger.showSnackBar(
-        SnackBar(content: Text('Image selection failed: ${e.toString()}')),
-      );
-    } finally {
-      _isPickingImage = false;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -262,370 +190,258 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 24.0,
-              vertical: 16.0,
+              vertical: 24.0,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Back Button and Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (_currentStep > 0)
-                      GestureDetector(
-                        onTap: _previousStep,
-                        child: const Icon(Icons.arrow_back),
-                      )
-                    else
-                      // Use a Spacer or SizedBox for alignment if the back button is missing
-                      const SizedBox.shrink(),
+                // Header / Back Button
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Icon(Icons.arrow_back, color: Colors.black87),
+                ),
+                const SizedBox(height: 24),
 
-                    // Step Indicator (X of 4)
-                    Text(
-                      '${_currentStep + 1} of 4',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
+                // Logo
+                Center(child: _buildLogo()),
+                const SizedBox(height: 24),
+
+                // Title
+                const Text(
+                  'Create Account',
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please fill in your details to sign up',
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+                const SizedBox(height: 32),
+
+                // Form Fields
+                _buildTextField(
+                  controller: _nameController,
+                  label: 'Full Name',
+                  hint: 'Enter your full name',
+                ),
+                const SizedBox(height: 16),
+
+                _buildDatePickerField(),
+                const SizedBox(height: 16),
+
+                _buildTextField(
+                  controller: _addressController,
+                  label: 'Address',
+                  hint: 'Enter your address',
+                ),
+                const SizedBox(height: 16),
+
+                _buildTextField(
+                  controller: _phoneController,
+                  label: 'Phone Number',
+                  hint: 'Enter your phone number (digits only)',
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 16),
+
+                // Role Dropdown
+                const Text(
+                  'I am a:',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedRole,
+                      isExpanded: true,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'student',
+                          child: Text('Student'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'professor',
+                          child: Text('Professor'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedRole = value);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                _buildTextField(
+                  controller: _emailController,
+                  label: 'Email',
+                  hint: 'Enter your email',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 16),
+
+                _buildPasswordField(
+                  controller: _passwordController,
+                  label: 'Password',
+                  hint: 'Create a password',
+                  isObscure: _obscurePassword,
+                  toggleObscure: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                ),
+                const SizedBox(height: 16),
+
+                _buildPasswordField(
+                  controller: _confirmPasswordController,
+                  label: 'Confirm Password',
+                  hint: 'Re-enter your password',
+                  isObscure: _obscureConfirmPassword,
+                  toggleObscure: () => setState(
+                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Terms
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _agreeToTerms,
+                      onChanged: (val) =>
+                          setState(() => _agreeToTerms = val ?? false),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _showTermsDialog(),
+                        child: const Text(
+                          'I agree to the Terms and Conditions',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.blue,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+
+                // Sign Up Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _register,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Separator
+                const Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('or', style: TextStyle(color: Colors.grey)),
+                    ),
+                    Expanded(child: Divider()),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // Logo (only on first step, matching Figma/Login)
-                if (_currentStep == 0)
-                  Center(
-                    child: Column(
-                      children: [_buildLogo(), const SizedBox(height: 32)],
+                // Google Sign In
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : _signInWithGoogle,
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      side: const BorderSide(color: Colors.grey),
                     ),
-                  ),
-
-                // Step Content Title
-                Text(
-                  _getStepTitle(),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Progress Bar (Black) - 4 steps total now
-                LinearProgressIndicator(
-                  value: (_currentStep + 1) / 4,
-                  minHeight: 3,
-                  backgroundColor: Colors.grey[300],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.black),
-                  borderRadius: BorderRadius.circular(1.5),
-                ),
-                const SizedBox(height: 32),
-
-                // Step 1: Personal Information
-                if (_currentStep == 0) ...[
-                  _buildTextField(
-                    controller: _nameController,
-                    label: 'Name',
-                    hint: 'Enter your full name',
-                  ),
-                  const SizedBox(height: 24),
-
-                  _buildDatePickerField(),
-                  const SizedBox(height: 24),
-
-                  _buildTextField(
-                    controller: _addressController,
-                    label: 'Address',
-                    hint: 'Enter your address',
-                  ),
-                  const SizedBox(height: 24),
-
-                  _buildTextField(
-                    controller: _phoneController,
-                    label: 'Phone No.',
-                    hint: 'Enter your phone number',
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Role Selection
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'I am a:',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedRole,
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'student',
-                                child: Text('Student'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'professor',
-                                child: Text('Professor'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _selectedRole = value);
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ]
-                // Step 2: Email
-                else if (_currentStep == 1) ...[
-                  _buildTextField(
-                    controller: _emailController,
-                    label: 'Email',
-                    hint: 'Enter your email',
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                ]
-                // Step 3: Password
-                else if (_currentStep == 2) ...[
-                  _buildPasswordField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: 'Create a password',
-                    isObscure: _obscurePassword,
-                    toggleObscure: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  _buildPasswordField(
-                    controller: _confirmPasswordController,
-                    label: 'Confirm Password',
-                    hint: 'Confirm your password',
-                    isObscure: _obscureConfirmPassword,
-                    toggleObscure: () {
-                      setState(
-                        () =>
-                            _obscureConfirmPassword = !_obscureConfirmPassword,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  // Terms and Conditions
-                  Row(
-                    children: [
-                      Checkbox(
-                        value: _agreeToTerms,
-                        onChanged: (value) {
-                          setState(() => _agreeToTerms = value ?? false);
-                        },
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'I agree to the Terms and Conditions',
-                          style: TextStyle(fontSize: 12, color: Colors.black87),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Terms and Conditions'),
-                              content: const SingleChildScrollView(
-                                child: Text(
-                                  'Here are the terms and conditions...\n\n1. Use the app responsibly.\n2. Do not share your password.\n3. Respect other users.\n\n(This is a placeholder for actual terms)',
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Close'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                        child: const Text('Read'),
-                      ),
-                    ],
-                  ),
-                ],
-                // Step 4: Profile Photo (optional)
-                if (_currentStep == 3)
-                  Center(
-                    child: Column(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        GestureDetector(
-                          onTap: _pickProfileImage,
-                          child: CircleAvatar(
-                            radius: 48,
-                            backgroundImage: _profileImageFile != null
-                                ? FileImage(_profileImageFile!) as ImageProvider
-                                : null,
-                            child: _profileImageFile == null
-                                ? const Icon(Icons.camera_alt, size: 36)
-                                : null,
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: SvgPicture.asset(
+                            'assets/images/icons8-google.svg',
+                            width: 24,
+                            height: 24,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () {
-                            // Skip profile photo and submit registration
-                            _register();
-                          },
-                          child: const Text('Skip for now'),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Continue with Google',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
                         ),
                       ],
                     ),
                   ),
-
+                ),
                 const SizedBox(height: 32),
 
-                // Navigation Buttons
+                // Login Link
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (_currentStep > 0)
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _previousStep,
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            side: const BorderSide(color: Colors.grey),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          child: const Text(
-                            'Back',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
-                            ),
-                          ),
+                    const Text(
+                      'Already have an account? ',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: const Text(
+                        'Sign in',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ),
-                    if (_currentStep > 0) const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _currentStep < 3
-                            ? _nextStep
-                            : (_isLoading ? null : _register),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                _currentStep < 3 ? 'Next' : 'Sign up',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 16),
-
-                // Sign In / Google Buttons (only on first step, matching Figma)
-                if (_currentStep == 0) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Already have an account? ',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: const Text(
-                          'Sign in',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const Row(
-                    children: [
-                      Expanded(child: Divider()),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('or', style: TextStyle(color: Colors.grey)),
-                      ),
-                      Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton(
-                      onPressed: _isLoading ? null : _signInWithGoogle,
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        side: const BorderSide(color: Colors.grey),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: SvgPicture.asset(
-                              'assets/images/icons8-google.svg',
-                              width: 24,
-                              height: 24,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Continue with Google',
-                            style: TextStyle(fontSize: 14, color: Colors.black),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -636,17 +452,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // --- HELPER WIDGETS ---
 
-  String _getStepTitle() {
-    switch (_currentStep) {
-      case 0:
-        return 'Create Account';
-      case 1:
-        return "What's your email?";
-      case 2:
-        return 'Create a Password';
-      default:
-        return 'Register';
-    }
+  Widget _buildLogo() {
+    return Image.asset(
+      'lib/assets/images/icons/logo_keitask.png',
+      width: 120, // Smaller logo for header
+      height: 120,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) =>
+          const Icon(Icons.task, size: 80, color: Colors.teal),
+    );
+  }
+
+  void _showTermsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Terms and Conditions'),
+        content: const SingleChildScrollView(
+          child: Text(
+            '1. Use responsibly.\n2. Respect others.\n3. Data privacy policy applies.\n...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTextField({
@@ -660,11 +494,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87, // Fixed faded label
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -686,10 +516,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.blue),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
           ),
           keyboardType: keyboardType,
         ),
@@ -703,20 +529,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         const Text(
           'Birthday',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87, // Fixed faded label
-          ),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: _birthdayController,
+          readOnly: true,
+          onTap: () async {
+            final date = await showDatePicker(
+              context: context,
+              initialDate: DateTime(2000),
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now(),
+            );
+            if (date != null) {
+              _birthdayController.text =
+                  '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
+            }
+          },
           decoration: InputDecoration(
             hintText: 'MM/DD/YYYY',
             hintStyle: const TextStyle(color: Colors.grey),
             filled: true,
             fillColor: Colors.grey[100],
+            suffixIcon: const Icon(Icons.calendar_today),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade400),
@@ -729,25 +565,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.blue),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            suffixIcon: const Icon(Icons.calendar_today),
           ),
-          readOnly: true,
-          onTap: () async {
-            final date = await showDatePicker(
-              context: context,
-              initialDate: DateTime(2000),
-              firstDate: DateTime(1950),
-              lastDate: DateTime.now(),
-            );
-            if (date != null) {
-              _birthdayController.text =
-                  '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
-            }
-          },
         ),
       ],
     );
@@ -765,11 +583,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87, // Fixed faded label
-          ),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
         TextField(
@@ -780,6 +594,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             hintStyle: const TextStyle(color: Colors.grey),
             filled: true,
             fillColor: Colors.grey[100],
+            suffixIcon: IconButton(
+              icon: Icon(isObscure ? Icons.visibility_off : Icons.visibility),
+              onPressed: toggleObscure,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey.shade400),
@@ -792,30 +610,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               borderRadius: BorderRadius.circular(8),
               borderSide: const BorderSide(color: Colors.blue),
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            suffixIcon: IconButton(
-              icon: Icon(isObscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: toggleObscure,
-            ),
           ),
         ),
       ],
-    );
-  }
-
-  // Logo builder using image asset
-  Widget _buildLogo() {
-    return Image.asset(
-      'lib/assets/images/icons/logo_keitask.png',
-      width: 250,
-      height: 250,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) {
-        return const Icon(Icons.task, size: 200, color: Colors.teal);
-      },
     );
   }
 }

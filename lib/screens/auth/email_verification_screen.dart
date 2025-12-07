@@ -134,7 +134,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           TextButton(
             onPressed: () async {
               await fb_auth.FirebaseAuth.instance.signOut();
-              if (mounted) {
+              if (context.mounted) {
                 Navigator.of(context).pop(); // Go back to login/register
               }
             },
