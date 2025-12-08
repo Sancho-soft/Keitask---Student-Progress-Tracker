@@ -257,9 +257,14 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       body: StreamBuilder<List<app_models.User>>(
         stream: authService.getAllUsersStream(),
         builder: (context, snapshot) {
-          // Filter out admin users and the current user (if professor)
+          // Filter out admin users, professors, and the current user
           final assignableUsers = (snapshot.data ?? [])
-              .where((u) => u.role != 'admin' && u.id != widget.user?.id)
+              .where(
+                (u) =>
+                    u.role != 'admin' &&
+                    u.role != 'professor' &&
+                    u.id != widget.user?.id,
+              )
               .toList();
 
           return SingleChildScrollView(

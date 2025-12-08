@@ -120,8 +120,6 @@ class FirestoreTaskService extends ChangeNotifier {
         'completionStatus.$completedBy': DateTime.now().toIso8601String(),
       });
 
-      // Points awarding logic removed as per request
-
       // Check if all assignees have completed
       final completionStatus = Map<String, dynamic>.from(
         taskData['completionStatus'] ?? {},
@@ -142,12 +140,17 @@ class FirestoreTaskService extends ChangeNotifier {
         allCompleted = true;
       }
 
+      // Points awarding logic: Simple completion = 10 points
       if (allCompleted) {
         await taskRef.update({
           'status': 'completed',
           'completedAt': FieldValue.serverTimestamp(),
           'rejectionReason': null,
         });
+
+        // Award points to all assignees who completed it (if not already graded)
+        // For simplicity in this flow, we award points to the user who just completed it
+        await _awardPoints(completedBy, 10);
       }
     } else {
       // Fallback for legacy calls or admin overrides
@@ -255,8 +258,23 @@ class FirestoreTaskService extends ChangeNotifier {
       });
     }
 
-    // Points awarding logic removed as per request
+    // Points awarding logic: Graded = (score / maxScore) * 100
+    if (grade.maxScore > 0) {
+      final points = ((grade.score / grade.maxScore) * 100).round();
+      await _awardPoints(studentId, points);
+    }
 
     notifyListeners();
+  }
+
+  // Helper to award points
+  Future<void> _awardPoints(String userId, int points) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'points': FieldValue.increment(points),
+      });
+    } catch (e) {
+      debugPrint('Error awarding points: $e');
+    }
   }
 }
