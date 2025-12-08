@@ -70,11 +70,14 @@ class LeaderboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Light background for contrast
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Leaderboard',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -126,7 +129,7 @@ class LeaderboardScreen extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-                  child: _buildPodium(topThree),
+                  child: _buildPodium(context, topThree),
                 ),
               ),
               // The Rest of the List
@@ -134,7 +137,7 @@ class LeaderboardScreen extends StatelessWidget {
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final userDoc = rest[index];
                   final rank = index + 4; // 1-based, skipping top 3
-                  return _buildRankItem(userDoc, rank);
+                  return _buildRankItem(context, userDoc, rank);
                 }, childCount: rest.length),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 20)),
@@ -145,30 +148,32 @@ class LeaderboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPodium(List<QueryDocumentSnapshot> topThree) {
+  Widget _buildPodium(
+    BuildContext context,
+    List<QueryDocumentSnapshot> topThree,
+  ) {
     if (topThree.isEmpty) return const SizedBox();
 
     // Reorder for visual podium: 2nd (Left), 1st (Center/Top), 3rd (Right)
-    // If we have less than 3, we handle gracefully.
     List<Widget> podiumItems = [];
 
     // 2nd Place
     if (topThree.length >= 2) {
-      podiumItems.add(_buildPodiumItem(topThree[1], 2));
+      podiumItems.add(_buildPodiumItem(context, topThree[1], 2));
     } else {
-      podiumItems.add(const Expanded(child: SizedBox()));
+      podiumItems.add(const SizedBox(width: 100)); // Placeholder spacing
     }
 
     // 1st Place
     if (topThree.isNotEmpty) {
-      podiumItems.add(_buildPodiumItem(topThree[0], 1));
+      podiumItems.add(_buildPodiumItem(context, topThree[0], 1));
     }
 
     // 3rd Place
     if (topThree.length >= 3) {
-      podiumItems.add(_buildPodiumItem(topThree[2], 3));
+      podiumItems.add(_buildPodiumItem(context, topThree[2], 3));
     } else {
-      podiumItems.add(const Expanded(child: SizedBox()));
+      podiumItems.add(const SizedBox(width: 100)); // Placeholder spacing
     }
 
     return Row(
@@ -178,22 +183,30 @@ class LeaderboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPodiumItem(QueryDocumentSnapshot doc, int rank) {
+  Widget _buildPodiumItem(
+    BuildContext context,
+    QueryDocumentSnapshot doc,
+    int rank,
+  ) {
     final data = doc.data() as Map<String, dynamic>;
     final name = data['name'] ?? 'Unknown';
     final points = data['points'] ?? 0;
     final profileImage = data['profileImage'];
 
     // Podium styling based on rank
-    double avatarSize = rank == 1 ? 50 : 40;
-    double heightOffset = rank == 1 ? 0 : (rank == 2 ? 20 : 40);
+    double avatarSize = rank == 1 ? 48 : 36;
+    // Height offset steps
+    double heightOffset = rank == 1 ? 40 : (rank == 2 ? 16 : 0);
+
     Color color = rank == 1
         ? const Color(0xFFFFD700) // Gold
         : rank == 2
         ? const Color(0xFFC0C0C0) // Silver
         : const Color(0xFFCD7F32); // Bronze
 
-    return Expanded(
+    return Container(
+      width: 100, // Fixed width for consistent centering
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -204,7 +217,7 @@ class LeaderboardScreen extends StatelessWidget {
               child: Icon(
                 Icons.emoji_events,
                 color: Color(0xFFFFD700),
-                size: 32,
+                size: 28,
               ),
             ),
 
@@ -245,38 +258,46 @@ class LeaderboardScreen extends StatelessWidget {
           // Name
           Text(
             name,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
           ),
 
           // Points
           Container(
             margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withAlpha((0.2 * 255).round()),
-              borderRadius: BorderRadius.circular(12),
+              color: color.withAlpha(50),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               '$points pts',
               style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
                 fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
               ),
             ),
           ),
 
-          // Visual Podium Step
-          SizedBox(height: 10 + heightOffset),
+          // Spacer for step effect
+          SizedBox(height: heightOffset),
         ],
       ),
     );
   }
 
-  Widget _buildRankItem(QueryDocumentSnapshot doc, int rank) {
+  Widget _buildRankItem(
+    BuildContext context,
+    QueryDocumentSnapshot doc,
+    int rank,
+  ) {
     final data = doc.data() as Map<String, dynamic>;
     final name = data['name'] ?? 'Unknown';
     final points = data['points'] ?? 0;
@@ -285,11 +306,16 @@ class LeaderboardScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withAlpha((0.1 * 255).round()),
+            color: Colors.black.withAlpha(
+              (Theme.of(context).brightness == Brightness.dark
+                      ? 0.3
+                      : 0.1 * 255)
+                  .round(),
+            ),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

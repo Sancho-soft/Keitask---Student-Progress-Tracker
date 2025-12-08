@@ -160,18 +160,22 @@ class _UserDashboardState extends State<UserDashboard> {
                             children: [
                               Text(
                                 'Hi, ${(auth.appUser?.name ?? widget.user.name)}!',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
+                              Text(
                                 'Track your progress below.',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withAlpha(150),
                                 ),
                               ),
                             ],
@@ -216,11 +220,13 @@ class _UserDashboardState extends State<UserDashboard> {
                           return Stack(
                             children: [
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.notifications_none,
                                   size: 28,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
-                                color: Colors.grey[800],
                                 onPressed: () {
                                   _showNotificationsSheet(
                                     context,
@@ -259,14 +265,15 @@ class _UserDashboardState extends State<UserDashboard> {
                     physics: const NeverScrollableScrollPhysics(),
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio:
-                        1.25, // Adjusted to 1.25 to prevent overflow
+                    childAspectRatio: 1.25,
                     children: [
                       // Assigned (Blue)
                       _buildStatCard(
                         'Assigned',
                         '$assignedCount',
-                        const Color(0xFFE3F2FD),
+                        Theme.of(context).brightness == Brightness.dark
+                            ? Colors.blue.withAlpha(50)
+                            : const Color(0xFFE3F2FD),
                         Colors.blue,
                         Icons.assignment,
                       ),
@@ -274,7 +281,9 @@ class _UserDashboardState extends State<UserDashboard> {
                       _buildStatCard(
                         'Pending Approval',
                         '$pendingApprovalCount',
-                        const Color(0xFFFFF3E0),
+                        Theme.of(context).brightness == Brightness.dark
+                            ? Colors.orange.withAlpha(50)
+                            : const Color(0xFFFFF3E0),
                         Colors.orange,
                         Icons.hourglass_empty,
                       ),
@@ -282,7 +291,9 @@ class _UserDashboardState extends State<UserDashboard> {
                       _buildStatCard(
                         'Completed',
                         '$completedCount',
-                        const Color(0xFFE8F5E9),
+                        Theme.of(context).brightness == Brightness.dark
+                            ? Colors.green.withAlpha(50)
+                            : const Color(0xFFE8F5E9),
                         Colors.green,
                         Icons.check_circle,
                       ),
@@ -359,7 +370,9 @@ class _UserDashboardState extends State<UserDashboard> {
                         child: _buildStatCard(
                           'Rejected',
                           '$rejectedCount',
-                          const Color(0xFFFFEBEE),
+                          Theme.of(context).brightness == Brightness.dark
+                              ? Colors.red.withAlpha(50)
+                              : const Color(0xFFFFEBEE),
                           Colors.red,
                           Icons.cancel,
                         ),
@@ -368,7 +381,9 @@ class _UserDashboardState extends State<UserDashboard> {
                       _buildStatCard(
                         'Resubmitted',
                         '$resubmittedCount',
-                        const Color(0xFFF3E5F5),
+                        Theme.of(context).brightness == Brightness.dark
+                            ? Colors.purple.withAlpha(50)
+                            : const Color(0xFFF3E5F5),
                         Colors.purple,
                         Icons.refresh,
                       ),
@@ -382,12 +397,12 @@ class _UserDashboardState extends State<UserDashboard> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Progress Overview',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         // Blue Arrow Icon (tap to open progress detail)
@@ -400,7 +415,7 @@ class _UserDashboardState extends State<UserDashboard> {
                               ),
                             );
                           },
-                          child: const Icon(
+                          child: Icon(
                             Icons.arrow_forward,
                             size: 24,
                             color: Colors.blue,
@@ -412,11 +427,15 @@ class _UserDashboardState extends State<UserDashboard> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withAlpha(30),
+                            color: Colors.black.withAlpha(
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? 50
+                                  : 10,
+                            ),
                             spreadRadius: 2,
                             blurRadius: 10,
                             offset: const Offset(0, 4),
@@ -429,19 +448,21 @@ class _UserDashboardState extends State<UserDashboard> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Task Completion',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                               ),
                               Row(
                                 children: [
                                   Text(
                                     '$completionPercentage%',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.blue,
@@ -514,10 +535,10 @@ class _UserDashboardState extends State<UserDashboard> {
                                 'professor'
                             ? 'Recent Submissions'
                             : 'My Recent Tasks',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       TextButton(
@@ -607,10 +628,12 @@ class _UserDashboardState extends State<UserDashboard> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            color: Colors.white,
+            color: Theme.of(context).cardColor,
             boxShadow: [
               BoxShadow(
-                color: Colors.grey.withAlpha(20),
+                color: Colors.black.withAlpha(
+                  Theme.of(context).brightness == Brightness.dark ? 50 : 10,
+                ),
                 spreadRadius: 1,
                 blurRadius: 8,
                 offset: const Offset(0, 2),
@@ -635,10 +658,10 @@ class _UserDashboardState extends State<UserDashboard> {
                   children: [
                     Text(
                       task.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -647,14 +670,14 @@ class _UserDashboardState extends State<UserDashboard> {
                         Icon(
                           Icons.calendar_today,
                           size: 12,
-                          color: Colors.grey[600],
+                          color: Colors.grey,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           _formatDate(task.dueDate),
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 11,
-                            color: Colors.grey[600],
+                            color: Colors.grey,
                           ),
                         ),
                       ],
@@ -726,7 +749,7 @@ class _UserDashboardState extends State<UserDashboard> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -746,7 +769,9 @@ class _UserDashboardState extends State<UserDashboard> {
                 title,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey[700],
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[400]
+                      : Colors.grey[700],
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -756,7 +781,7 @@ class _UserDashboardState extends State<UserDashboard> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ],

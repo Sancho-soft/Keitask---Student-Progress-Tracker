@@ -151,6 +151,7 @@ class _UsersScreenState extends State<UsersScreen> {
     final currentUser = authService.appUser;
     final isProfessor = currentUser?.role == 'professor';
     final isAdmin = currentUser?.role == 'admin';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Force filter for professors if not already set (Professors can only see students usually)
     // But allowing professors to see other users depends on requirements.
@@ -165,10 +166,14 @@ class _UsersScreenState extends State<UsersScreen> {
           _isSelectionMode
               ? '${_selectedUserIds.length} Selected'
               : (isProfessor ? 'My Students' : 'Manage Users'),
+          style: TextStyle(
+            color: _isSelectionMode
+                ? null
+                : Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
         leading: widget.showBackButton || _isSelectionMode
             ? IconButton(
@@ -205,7 +210,7 @@ class _UsersScreenState extends State<UsersScreen> {
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    fillColor: Colors.grey[100],
+                    fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
                     contentPadding: const EdgeInsets.symmetric(
                       vertical: 0,
                       horizontal: 16,
@@ -263,10 +268,16 @@ class _UsersScreenState extends State<UsersScreen> {
                               }
                             });
                           },
-                          backgroundColor: Colors.grey[200],
-                          selectedColor: Colors.red[100],
+                          backgroundColor: isDark
+                              ? Colors.grey[800]
+                              : Colors.grey[200],
+                          selectedColor: isDark
+                              ? Colors.red.withAlpha(50)
+                              : Colors.red[100],
                           labelStyle: TextStyle(
-                            color: _showBanned ? Colors.red : Colors.black87,
+                            color: _showBanned
+                                ? Colors.red
+                                : (isDark ? Colors.grey[300] : Colors.black87),
                             fontWeight: _showBanned
                                 ? FontWeight.bold
                                 : FontWeight.normal,
@@ -368,7 +379,9 @@ class _UsersScreenState extends State<UsersScreen> {
                             ? const BorderSide(color: Colors.blue, width: 2)
                             : BorderSide.none,
                       ),
-                      color: isSelected ? Colors.blue.withAlpha(20) : null,
+                      color: isSelected
+                          ? Colors.blue.withAlpha(50)
+                          : Theme.of(context).cardColor,
                       child: Column(
                         children: [
                           ListTile(
@@ -405,8 +418,11 @@ class _UsersScreenState extends State<UsersScreen> {
                                           user.name.isNotEmpty
                                               ? user.name[0].toUpperCase()
                                               : '?',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.bold,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black87,
                                           ),
                                         )
                                       : null,
@@ -469,8 +485,12 @@ class _UsersScreenState extends State<UsersScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isUserProfessor
-                                            ? Colors.purple[100]
-                                            : Colors.blue[100],
+                                            ? (isDark
+                                                  ? Colors.purple.withAlpha(50)
+                                                  : Colors.purple[100])
+                                            : (isDark
+                                                  ? Colors.blue.withAlpha(50)
+                                                  : Colors.blue[100]),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -481,8 +501,12 @@ class _UsersScreenState extends State<UsersScreen> {
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: isUserProfessor
-                                              ? Colors.purple[800]
-                                              : Colors.blue[800],
+                                              ? (isDark
+                                                    ? Colors.purple[200]
+                                                    : Colors.purple[800])
+                                              : (isDark
+                                                    ? Colors.blue[200]
+                                                    : Colors.blue[800]),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -495,7 +519,9 @@ class _UsersScreenState extends State<UsersScreen> {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.red[100],
+                                          color: isDark
+                                              ? Colors.red.withAlpha(50)
+                                              : Colors.red[100],
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
@@ -504,7 +530,9 @@ class _UsersScreenState extends State<UsersScreen> {
                                           'BANNED',
                                           style: TextStyle(
                                             fontSize: 10,
-                                            color: Colors.red[800],
+                                            color: isDark
+                                                ? Colors.red[200]
+                                                : Colors.red[800],
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -846,16 +874,21 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
       onSelected: (_) => onTap(),
-      selectedColor: Colors.blue.withAlpha(30),
+      selectedColor: isDark
+          ? Colors.blue.withAlpha(50)
+          : Colors.blue.withAlpha(30),
       labelStyle: TextStyle(
-        color: isSelected ? Colors.blue : Colors.black87,
+        color: isSelected
+            ? Colors.blue
+            : (isDark ? Colors.grey[300] : Colors.black87),
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
-      backgroundColor: Colors.grey[200],
+      backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
     );
   }
 }

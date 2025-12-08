@@ -413,19 +413,22 @@ class _TasksScreenState extends State<TasksScreen> {
         '${_getMonthName(_currentDisplayedDate.month)} ${_currentDisplayedDate.year}';
 
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Light background for contrast
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: widget.showBackButton
             ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                icon: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
                 onPressed: () => Navigator.pop(context),
               )
             : null,
         automaticallyImplyLeading: false,
         title: Text(
           monthYear,
-          style: const TextStyle(
-            color: Colors.black87,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
@@ -493,19 +496,25 @@ class _TasksScreenState extends State<TasksScreen> {
                     width: 50,
                     margin: const EdgeInsets.symmetric(horizontal: 5),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue : Colors.white,
+                      color: isSelected
+                          ? Theme.of(context).primaryColor
+                          : Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(25), // Capsule shape
                       border: isSelected
                           ? null
                           : Border.all(
                               color: isToday
-                                  ? Colors.blue.withAlpha(100)
-                                  : Colors.grey.shade200,
+                                  ? Theme.of(
+                                      context,
+                                    ).primaryColor.withAlpha(100)
+                                  : Theme.of(context).dividerColor,
                             ),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: Colors.blue.withAlpha(100),
+                                color: Theme.of(
+                                  context,
+                                ).primaryColor.withAlpha(100),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -538,7 +547,9 @@ class _TasksScreenState extends State<TasksScreen> {
                             '${date.day}',
                             style: TextStyle(
                               fontSize: 16,
-                              color: isSelected ? Colors.white : Colors.black87,
+                              color: isSelected
+                                  ? Colors.white
+                                  : Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -548,8 +559,8 @@ class _TasksScreenState extends State<TasksScreen> {
                             margin: const EdgeInsets.only(top: 4),
                             width: 4,
                             height: 4,
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -571,10 +582,10 @@ class _TasksScreenState extends State<TasksScreen> {
               children: [
                 Text(
                   'Tasks for ${_selectedDate.day == DateTime.now().day && _selectedDate.month == DateTime.now().month ? "Today" : _formatDateDay(_selectedDate)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 GestureDetector(
@@ -585,7 +596,9 @@ class _TasksScreenState extends State<TasksScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: _showAllTasks ? Colors.blue : Colors.grey[200],
+                      color: _showAllTasks
+                          ? Theme.of(context).primaryColor
+                          : Theme.of(context).dividerColor.withAlpha(50),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -593,7 +606,9 @@ class _TasksScreenState extends State<TasksScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: _showAllTasks ? Colors.white : Colors.black87,
+                        color: _showAllTasks
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
@@ -784,11 +799,13 @@ class _TasksScreenState extends State<TasksScreen> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(10),
+              color: Colors.black.withAlpha(
+                Theme.of(context).brightness == Brightness.dark ? 50 : 10,
+              ),
               spreadRadius: 0,
               blurRadius: 10,
               offset: const Offset(0, 4),

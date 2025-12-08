@@ -15,9 +15,11 @@ class ProgressDetailScreen extends StatelessWidget {
     final tasksService = Provider.of<FirestoreTaskService>(context);
     final currentUserId = auth.appUser?.id ?? auth.firebaseUser?.uid;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Progress Detail')),
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: StreamBuilder<List<Task>>(
@@ -79,7 +81,9 @@ class ProgressDetailScreen extends StatelessWidget {
                         context,
                         'Approved',
                         approved,
-                        Colors.green.shade200,
+                        isDark
+                            ? Colors.green.withAlpha(50)
+                            : Colors.green.shade200,
                         Icons.check_circle,
                         Colors.green,
                       ),
@@ -87,7 +91,9 @@ class ProgressDetailScreen extends StatelessWidget {
                         context,
                         'Pending',
                         pending,
-                        Colors.orange.shade100,
+                        isDark
+                            ? Colors.orange.withAlpha(50)
+                            : Colors.orange.shade100,
                         Icons.schedule,
                         Colors.orange,
                       ),
@@ -95,7 +101,7 @@ class ProgressDetailScreen extends StatelessWidget {
                         context,
                         'Rejected',
                         rejected,
-                        Colors.red.shade100,
+                        isDark ? Colors.red.withAlpha(50) : Colors.red.shade100,
                         Icons.cancel,
                         Colors.red,
                       ),
@@ -103,7 +109,9 @@ class ProgressDetailScreen extends StatelessWidget {
                         context,
                         'Resubmitted',
                         resubmitted,
-                        Colors.purple.shade100,
+                        isDark
+                            ? Colors.purple.withAlpha(50)
+                            : Colors.purple.shade100,
                         Icons.refresh,
                         Colors.purple,
                       ),
@@ -111,13 +119,18 @@ class ProgressDetailScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 18),
-                  const Text(
+                  Text(
                     'Progress Overview',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Card(
                     elevation: 2,
+                    color: Theme.of(context).cardColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -151,7 +164,9 @@ class ProgressDetailScreen extends StatelessWidget {
                             child: LinearProgressIndicator(
                               value: percent,
                               minHeight: 10,
-                              backgroundColor: Colors.grey[200],
+                              backgroundColor: isDark
+                                  ? Colors.grey[800]
+                                  : Colors.grey[200],
                               valueColor: const AlwaysStoppedAnimation<Color>(
                                 Colors.blue,
                               ),
@@ -177,14 +192,19 @@ class ProgressDetailScreen extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'My Recent Tasks',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 8),
 
                   if (myTasks.isEmpty)
                     Card(
+                      color: Theme.of(context).cardColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -230,24 +250,29 @@ class ProgressDetailScreen extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          tileColor: Colors.white,
+                          tileColor: Theme.of(context).cardColor,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 8,
                           ),
                           title: Text(
                             t.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w600,
-                              color: Colors.black87,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           subtitle: Text(
                             t.description,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey[400]
+                                  : Colors.grey[600],
+                            ),
                           ),
-                          trailing: _statusChip(t.status),
+                          trailing: _statusChip(context, t.status),
                         );
                       },
                     ),
@@ -277,7 +302,9 @@ class ProgressDetailScreen extends StatelessWidget {
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: Colors.white,
+            backgroundColor: Theme.of(context).brightness == Brightness.dark
+                ? Colors.black26
+                : Colors.white,
             child: Icon(icon, color: color),
           ),
           const SizedBox(width: 12),
@@ -288,7 +315,9 @@ class ProgressDetailScreen extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: color.withAlpha(200),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[300]
+                        : color.withAlpha(200),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -298,7 +327,9 @@ class ProgressDetailScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: color.darker(),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : color.darker(),
                   ),
                 ),
               ],
@@ -309,25 +340,28 @@ class ProgressDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _statusChip(String? status) {
+  Widget _statusChip(BuildContext context, String? status) {
     final s = (status ?? '').toLowerCase();
-    Color bg = Colors.grey.shade200;
-    Color text = Colors.black87;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Color bg = isDark ? Colors.grey[800]! : Colors.grey.shade200;
+    Color text = isDark ? Colors.grey[300]! : Colors.black87;
+
     if (s == 'approved') {
-      bg = Colors.green.shade100;
-      text = Colors.green.shade800;
+      bg = isDark ? Colors.green.withAlpha(50) : Colors.green.shade100;
+      text = isDark ? Colors.green[200]! : Colors.green.shade800;
     } else if (s == 'pending' || s == 'assigned') {
-      bg = Colors.orange.shade100;
-      text = Colors.orange.shade800;
+      bg = isDark ? Colors.orange.withAlpha(50) : Colors.orange.shade100;
+      text = isDark ? Colors.orange[200]! : Colors.orange.shade800;
     } else if (s == 'rejected') {
-      bg = Colors.red.shade100;
-      text = Colors.red.shade800;
+      bg = isDark ? Colors.red.withAlpha(50) : Colors.red.shade100;
+      text = isDark ? Colors.red[200]! : Colors.red.shade800;
     } else if (s == 'resubmitted' || s == 'resubmit') {
-      bg = Colors.purple.shade100;
-      text = Colors.purple.shade800;
+      bg = isDark ? Colors.purple.withAlpha(50) : Colors.purple.shade100;
+      text = isDark ? Colors.purple[200]! : Colors.purple.shade800;
     } else if (s == 'completed') {
-      bg = Colors.blue.shade100;
-      text = Colors.blue.shade800;
+      bg = isDark ? Colors.blue.withAlpha(50) : Colors.blue.shade100;
+      text = isDark ? Colors.blue[200]! : Colors.blue.shade800;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

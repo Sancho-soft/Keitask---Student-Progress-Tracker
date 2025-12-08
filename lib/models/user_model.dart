@@ -10,6 +10,7 @@ class User {
   final int points;
   final bool isApproved;
   final DateTime? createdAt;
+  final DateTime? lastActive;
 
   User({
     required this.id,
@@ -26,6 +27,7 @@ class User {
     this.points = 0,
     this.address,
     this.createdAt,
+    this.lastActive,
   });
 
   final List<String>? enrolledCourseIds;
@@ -54,10 +56,21 @@ class User {
       notificationsEnabled: json['notificationsEnabled'] ?? true,
       points: json['points'] ?? 0,
       address: json['address'],
-      createdAt: json['createdAt'] != null
-          ? (json['createdAt'] as dynamic).toDate()
-          : null,
+      createdAt: _parseDateTime(json['createdAt']),
+      lastActive: _parseDateTime(json['lastActive']),
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    // Handle Firestore Timestamp (which has toDate())
+    try {
+      return (value as dynamic).toDate();
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -76,6 +89,7 @@ class User {
       'notificationsEnabled': notificationsEnabled,
       'points': points,
       'createdAt': createdAt,
+      'lastActive': lastActive,
     };
   }
 }

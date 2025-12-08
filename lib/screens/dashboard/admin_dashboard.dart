@@ -220,28 +220,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             _buildStatCard(
                               'Total Users',
                               '$totalUsers',
-                              Colors.blue[50]!,
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.blue.withAlpha(50)
+                                  : Colors.blue[50]!,
                               Colors.blue,
                               Icons.people,
                             ),
                             _buildStatCard(
                               'Total Students',
                               '$totalStudents',
-                              const Color(0xFFE8F5E9),
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.green.withAlpha(50)
+                                  : const Color(0xFFE8F5E9),
                               Colors.green,
                               Icons.school,
                             ),
                             _buildStatCard(
                               'Active Professors',
                               '$totalProfessors',
-                              const Color(0xFFF3E5F5),
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.purple.withAlpha(50)
+                                  : const Color(0xFFF3E5F5),
                               Colors.purple,
                               Icons.person_outline,
                             ),
                             _buildStatCard(
                               'Pending Approvals',
                               '$pendingApprovals',
-                              const Color(0xFFFFF3E0),
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.orange.withAlpha(50)
+                                  : const Color(0xFFFFF3E0),
                               Colors.orange,
                               Icons.pending_actions,
                             ),
@@ -258,12 +266,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Analytics',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -273,11 +281,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           height: 300,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withAlpha(10),
+                                color: Colors.black.withAlpha(20),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -286,15 +294,54 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'User Growth',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 24),
                               Expanded(child: _buildUserGrowthChart(users)),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // User Activity Chart (New)
+                        Container(
+                          height: 300,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(20),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'User Activities (Online)',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Expanded(child: _buildUserActivityChart(users)),
                             ],
                           ),
                         ),
@@ -316,11 +363,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               height: 300,
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Theme.of(context).cardColor,
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withAlpha(10),
+                                    color: Colors.black.withAlpha(20),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -329,11 +376,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Task Distribution',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                     ),
                                   ),
                                   const SizedBox(height: 24),
@@ -433,18 +483,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     final validUsers = users.where((u) => u.createdAt != null).toList();
 
+    // If we have users but no timestamps, or only 1 timestamp, we still want to show something
     if (validUsers.isEmpty && users.isNotEmpty) {
       return Center(
         child: Text('Total Users: ${users.length} (No timeline data)'),
       );
-    } else if (validUsers.isEmpty) {
-      return const Center(child: Text('No user data'));
     }
 
     validUsers.sort((a, b) => a.createdAt!.compareTo(b.createdAt!));
 
     final Map<int, int> growthMap = {};
     int count = (users.length - validUsers.length);
+
+    // Pre-calculate initial count (users with null creation date usually exist safely before)
+    // If all users have timestamps, count starts at 0.
 
     for (var user in validUsers) {
       count++;
@@ -455,6 +507,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         date.day,
       ).millisecondsSinceEpoch;
       growthMap[dayKey] = count;
+    }
+
+    // Handle single data point case by adding a fake previous point
+    if (growthMap.length == 1) {
+      final singleKey = growthMap.keys.first;
+      final yesterday = DateTime.fromMillisecondsSinceEpoch(
+        singleKey,
+      ).subtract(const Duration(days: 1));
+      growthMap[yesterday.millisecondsSinceEpoch] = 0; // Start from 0 yesterday
     }
 
     final sortedKeys = growthMap.keys.toList()..sort();
@@ -637,6 +698,150 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         const SizedBox(width: 8),
         Text('$title: $count', style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildUserActivityChart(List<User> users) {
+    // 1. Filter users with lastActive
+    final activeUsers = users.where((u) => u.lastActive != null).toList();
+    if (activeUsers.isEmpty) {
+      return const Center(child: Text('No activity data yet'));
+    }
+
+    // 2. Group by "Time Ago" categories
+    int today = 0;
+    int yesterday = 0;
+    int thisWeek = 0;
+    int older = 0;
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+    final weekStart = todayStart.subtract(const Duration(days: 7));
+
+    for (var user in activeUsers) {
+      final lastActive = user.lastActive!;
+      if (lastActive.isAfter(todayStart)) {
+        today++;
+      } else if (lastActive.isAfter(yesterdayStart)) {
+        yesterday++;
+      } else if (lastActive.isAfter(weekStart)) {
+        thisWeek++;
+      } else {
+        older++;
+      }
+    }
+
+    // 3. Prepare Bar Chart Data
+    // 0: Today, 1: Yesterday, 2: This Week, 3: Older
+    final barGroups = [
+      _makeBarGroup(0, today.toDouble(), Colors.blue),
+      _makeBarGroup(1, yesterday.toDouble(), Colors.lightBlue),
+      _makeBarGroup(2, thisWeek.toDouble(), Colors.orange),
+      _makeBarGroup(3, older.toDouble(), Colors.grey),
+    ];
+
+    // Find max Y for consistent scaling
+    double maxY = 0;
+    for (var g in barGroups) {
+      if (g.barRods.first.toY > maxY) maxY = g.barRods.first.toY;
+    }
+    maxY = (maxY * 1.2).ceilToDouble(); // Add headroom
+    if (maxY == 0) maxY = 5;
+
+    return BarChart(
+      BarChartData(
+        maxY: maxY,
+        barGroups: barGroups,
+        titlesData: FlTitlesData(
+          show: true,
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, meta) {
+                const style = TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                );
+                String text;
+                switch (value.toInt()) {
+                  case 0:
+                    text = 'Today';
+                    break;
+                  case 1:
+                    text = 'Yest.';
+                    break;
+                  case 2:
+                    text = 'Week';
+                    break;
+                  case 3:
+                    text = 'Older';
+                    break;
+                  default:
+                    text = '';
+                }
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  space: 4,
+                  child: Text(text, style: style),
+                );
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 28,
+              interval: maxY > 10 ? 5 : 1,
+              getTitlesWidget: (value, meta) {
+                if (value % 1 != 0) return const SizedBox(); // Integers only
+                return Text(
+                  value.toInt().toString(),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                );
+              },
+            ),
+          ),
+        ),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: maxY > 10 ? 5 : 1,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(color: Colors.grey.withAlpha(50), strokeWidth: 1);
+          },
+        ),
+        borderData: FlBorderData(show: false),
+      ),
+    );
+  }
+
+  BarChartGroupData _makeBarGroup(int x, double y, Color color) {
+    return BarChartGroupData(
+      x: x,
+      barRods: [
+        BarChartRodData(
+          toY: y,
+          color: color,
+          width: 16,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            topRight: Radius.circular(4),
+          ),
+          backDrawRodData: BackgroundBarChartRodData(
+            show: true,
+            toY: 0, // No full background needed
+            color: Colors.grey.withAlpha(30),
+          ),
+        ),
       ],
     );
   }

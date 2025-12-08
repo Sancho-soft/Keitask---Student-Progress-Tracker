@@ -17,16 +17,19 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Professor Approvals',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         automaticallyImplyLeading: false,
       ),
       body: StreamBuilder<List<User>>(
@@ -74,6 +77,7 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
               final professor = pendingProfessors[index];
               return Card(
                 elevation: 2,
+                color: Theme.of(context).cardColor,
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -87,6 +91,9 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                         children: [
                           CircleAvatar(
                             radius: 24,
+                            backgroundColor: isDark
+                                ? Colors.grey[800]
+                                : Colors.grey[200],
                             backgroundImage:
                                 (professor.profileImage != null &&
                                     professor.profileImage!.isNotEmpty)
@@ -99,8 +106,11 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                                     professor.name.isNotEmpty
                                         ? professor.name[0].toUpperCase()
                                         : '?',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black87,
                                     ),
                                   )
                                 : null,
@@ -112,16 +122,21 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                               children: [
                                 Text(
                                   professor.name,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
                                 ),
                                 Text(
                                   professor.email,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey,
+                                    color: isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey,
                                   ),
                                 ),
                               ],
@@ -133,13 +148,17 @@ class _AdminTasksApprovalScreenState extends State<AdminTasksApprovalScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.orange[100],
+                              color: isDark
+                                  ? Colors.orange.withAlpha(50)
+                                  : Colors.orange[100],
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
+                            child: Text(
                               'PENDING',
                               style: TextStyle(
-                                color: Colors.orange,
+                                color: isDark
+                                    ? Colors.orange[300]
+                                    : Colors.orange,
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),

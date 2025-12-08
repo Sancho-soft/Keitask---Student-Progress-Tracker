@@ -185,9 +185,9 @@ class MyApp extends StatelessWidget {
               seedColor: const Color(0xFF222831),
               brightness: Brightness.dark,
             ).copyWith(
-              primary: const Color(0xFF222831),
-              secondary: const Color(0xFF393E46),
-              primaryContainer: const Color(0xFF1E2933),
+              primary: const Color(0xFF00ADB5), // Teal for primary action
+              secondary: const Color(0xFF00FFF5),
+              primaryContainer: const Color(0xFF393E46),
             ),
         scaffoldBackgroundColor: const Color(0xFF222831),
         appBarTheme: const AppBarTheme(
@@ -250,6 +250,15 @@ class MyApp extends StatelessWidget {
         '/admin/users': (context) {
           return const UsersScreen();
         },
+      },
+      builder: (context, child) {
+        final theme = Provider.of<ThemeService>(context);
+        return MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(theme.textScaleFactor)),
+          child: child!,
+        );
       },
     );
   }

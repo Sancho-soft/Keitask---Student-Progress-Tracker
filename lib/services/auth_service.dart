@@ -88,7 +88,14 @@ class AuthService extends ChangeNotifier {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
       if (doc.exists) {
-        appUser = app_models.User.fromJson(doc.data()!);
+        var userData = doc.data()!;
+        // Fallback: If Firestore 'createdAt' is missing, use FirebaseAuth metadata
+        if (userData['createdAt'] == null && firebaseUser != null) {
+          userData['createdAt'] = firebaseUser!.metadata.creationTime;
+          // Optionally save this back to Firestore to persist it
+          // await _firestore.collection('users').doc(uid).update({'createdAt': userData['createdAt']});
+        }
+        appUser = app_models.User.fromJson(userData);
       } else {
         // create a minimal record if missing
         final u = app_models.User(
@@ -97,9 +104,14 @@ class AuthService extends ChangeNotifier {
           name: firebaseUser?.displayName ?? '',
           role: 'user',
           isApproved: true,
+          createdAt: firebaseUser?.metadata.creationTime, // Use Auth metadata
         );
         final userData = u.toJson();
-        userData['createdAt'] = FieldValue.serverTimestamp(); // Add timestamp
+        // Convert DateTime to Timestamp for Firestore
+        userData['createdAt'] = userData['createdAt'] != null
+            ? Timestamp.fromDate(userData['createdAt'])
+            : FieldValue.serverTimestamp();
+
         await _firestore.collection('users').doc(uid).set(userData);
         appUser = u;
       }
@@ -113,6 +125,15 @@ class AuthService extends ChangeNotifier {
         if (appUser!.role == 'professor' && !appUser!.isApproved) {
           await signOut();
           throw 'Your professor account is pending approval. Please contact admin@keitask.com.';
+        }
+
+        // Update lastActive timestamp if loading successful
+        try {
+          await _firestore.collection('users').doc(uid).update({
+            'lastActive': FieldValue.serverTimestamp(),
+          });
+        } catch (_) {
+          // Ignore failures to update lastActive (e.g. offline)
         }
       }
     } finally {

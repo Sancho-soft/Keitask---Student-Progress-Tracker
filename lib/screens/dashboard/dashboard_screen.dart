@@ -176,9 +176,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           user: widget.user,
           onSeeAllTasks: () => _onTabSelected(1), // Switch to Tasks tab
         ),
-        AdminTasksApprovalScreen(
+        TasksScreen(
           user: widget.user,
-        ), // Professors use this to approve/reject
+          showBackButton: false,
+        ), // Professor sees TasksScreen
         const SizedBox(), // Placeholder for "New Task" (handled in _onTabSelected)
         const LeaderboardScreen(), // Professor Leaderboard (was Analytics)
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),

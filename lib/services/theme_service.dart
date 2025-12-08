@@ -7,6 +7,9 @@ class ThemeService extends ChangeNotifier {
 
   ThemeMode get themeMode => _themeMode;
 
+  double _textScaleFactor = 1.0;
+  double get textScaleFactor => _textScaleFactor;
+
   ThemeService() {
     _loadFromPrefs();
   }
@@ -22,6 +25,16 @@ class ThemeService extends ChangeNotifier {
       } else {
         _themeMode = ThemeMode.system;
       }
+
+      final size = prefs.getString('text_size') ?? 'normal';
+      if (size == 'small') {
+        _textScaleFactor = 0.85;
+      } else if (size == 'large') {
+        _textScaleFactor = 1.15;
+      } else {
+        _textScaleFactor = 1.0;
+      }
+
       notifyListeners();
     } catch (_) {}
   }
@@ -35,6 +48,23 @@ class ThemeService extends ChangeNotifier {
           ? 'light'
           : (mode == ThemeMode.dark ? 'dark' : 'system');
       await prefs.setString(_prefKey, s);
+    } catch (_) {}
+  }
+
+  Future<void> setTextScale(String size) async {
+    if (size == 'small') {
+      _textScaleFactor = 0.85;
+    } else if (size == 'large') {
+      _textScaleFactor = 1.15;
+    } else {
+      _textScaleFactor = 1.0;
+    }
+
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('text_size', size);
     } catch (_) {}
   }
 }
