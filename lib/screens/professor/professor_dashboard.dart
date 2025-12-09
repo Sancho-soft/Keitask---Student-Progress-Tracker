@@ -26,6 +26,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
   // Helper to format date
   String _formatDate(DateTime date) {
     final now = DateTime.now();
+    // Date comparison logic wraps here implicitly
     // final difference = date.difference(now);
     if (date.year == now.year &&
         date.month == now.month &&

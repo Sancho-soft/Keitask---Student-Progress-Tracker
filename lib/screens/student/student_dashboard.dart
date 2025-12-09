@@ -1,5 +1,3 @@
-// keitask_management/lib/screens/student/student_dashboard.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -26,6 +24,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
   // Helper to format date
   String _formatDate(DateTime date) {
     final now = DateTime.now();
+    // Date comparison logic wraps here implicitly
     // final difference = date.difference(now);
     if (date.year == now.year &&
         date.month == now.month &&
