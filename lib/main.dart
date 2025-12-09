@@ -11,7 +11,7 @@ import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart'; // Ensure this path is correct
 import 'screens/auth/register_screen.dart'; // Ensure this path is correct
-import 'screens/tasks/create_task_screen.dart';
+import 'screens/professor/create_task_screen.dart';
 import 'screens/tasks/tasks_screen.dart';
 import 'screens/admin/users_screen.dart';
 import 'services/task_service.dart'; // NEW IMPORT
@@ -128,7 +128,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => FirestoreTaskService()),
         ChangeNotifierProvider(create: (_) => ThemeService()),
-        Provider(create: (_) => FirestoreNotificationService()),
+        ChangeNotifierProvider(create: (_) => FirestoreNotificationService()),
       ],
       child: MyApp(navigatorKey: appNavigatorKey),
     ),

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/user_model.dart';
 import '../../services/task_service.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
-import 'edit_task_screen.dart';
-import 'task_submission_screen.dart';
+import '../student/task_submission_screen.dart';
+import '../../models/grade_model.dart';
 
 class TasksScreen extends StatefulWidget {
   final User? user;
@@ -72,10 +73,6 @@ class _TasksScreenState extends State<TasksScreen> {
         .floor(); // 60 = 50 width + 10 margin
 
     // index 365 is today (start of list is today - 365)
-    // Actually, let's align with the builder logic:
-    // builder index 0 = today - 365 days.
-    // So index 365 = today.
-
     final date = DateTime.now().add(Duration(days: index - 365));
     if (date.month != _currentDisplayedDate.month ||
         date.year != _currentDisplayedDate.year) {
@@ -112,308 +109,16 @@ class _TasksScreenState extends State<TasksScreen> {
     }
   }
 
-  void _showTaskActionsSheet(
-    BuildContext context,
-    Task task,
-    TaskService taskService,
-    User? effectiveUser,
-  ) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        final firestore = Provider.of<FirestoreTaskService>(
-          context,
-          listen: false,
-        );
-        final statusLower = task.status.toLowerCase();
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  task.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const Divider(height: 1),
-              if (statusLower == 'rejected')
-                ListTile(
-                  leading: const Icon(
-                    Icons.report_problem,
-                    color: Colors.orange,
-                  ),
-                  title: const Text('View Rejection Reason'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    showDialog<void>(
-                      context: context,
-                      builder: (ctx) {
-                        return AlertDialog(
-                          title: const Text('Rejection Reason'),
-                          content: Text(
-                            task.rejectionReason ?? 'No reason provided.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(ctx).pop(),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                )
-              else ...[
-                // Action: Submit Task (Students only)
-                if (effectiveUser?.role != 'admin' &&
-                    effectiveUser?.role != 'professor')
-                  ListTile(
-                    leading: const Icon(Icons.upload_file, color: Colors.blue),
-                    title: const Text('Submit Task'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TaskSubmissionScreen(
-                            task: task,
-                            user: widget.user!,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                // Action: View Submission (Students only, if submitted)
-                if (effectiveUser?.role != 'admin' &&
-                    effectiveUser?.role != 'professor' &&
-                    (statusLower == 'pending' ||
-                        statusLower == 'approved' ||
-                        statusLower == 'completed' ||
-                        statusLower == 'resubmitted'))
-                  ListTile(
-                    leading: const Icon(Icons.visibility, color: Colors.blue),
-                    title: const Text('View Submission'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      // Show submission details dialog
-                      if (task.submissions != null &&
-                          task.submissions!.containsKey(effectiveUser!.id)) {
-                        final urls = task.submissions![effectiveUser.id]!;
-                        final notes =
-                            task.submissionNotes != null &&
-                                task.submissionNotes!.containsKey(
-                                  effectiveUser.id,
-                                )
-                            ? task.submissionNotes![effectiveUser.id]
-                            : null;
-
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('My Submission'),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ...urls.map(
-                                  (url) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: InkWell(
-                                      onTap: () {
-                                        // In a real app, launch URL
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(content: Text('Link: $url')),
-                                        );
-                                      },
-                                      child: Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.attachment,
-                                            size: 16,
-                                            color: Colors.blue,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              url.split('/').last,
-                                              style: const TextStyle(
-                                                color: Colors.blue,
-                                                decoration:
-                                                    TextDecoration.underline,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                if (notes != null && notes.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'Notes:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      notes,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          ),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('No submission found.')),
-                        );
-                      }
-                    },
-                  ),
-
-                ListTile(
-                  leading: const Icon(Icons.info_outline, color: Colors.blue),
-                  title: const Text('View Details'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(task.title),
-                        content: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                'Description:',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(task.description),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Due Date:',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(_formatDeadline(task.dueDate)),
-                            ],
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-
-                // Action: Edit Task (Admins/Professors only)
-                if (effectiveUser?.role == 'admin' ||
-                    effectiveUser?.role == 'professor')
-                  ListTile(
-                    leading: const Icon(Icons.edit, color: Colors.blue),
-                    title: const Text('Edit Task'),
-                    enabled:
-                        !(statusLower == 'approved' ||
-                            statusLower == 'completed'),
-                    onTap:
-                        (statusLower == 'approved' ||
-                            statusLower == 'completed')
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    EditTaskScreen(task: task),
-                              ),
-                            );
-                          },
-                  ),
-
-                // Action: Delete Task (Admins/Professors only)
-                if (effectiveUser?.role == 'admin' ||
-                    effectiveUser?.role == 'professor')
-                  ListTile(
-                    leading: const Icon(
-                      Icons.delete_outline,
-                      color: Colors.red,
-                    ),
-                    title: const Text('Delete Task'),
-                    onTap: () async {
-                      final nav = Navigator.of(context);
-                      final messenger = ScaffoldMessenger.of(context);
-                      await firestore.deleteTask(task.id);
-                      nav.pop();
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('Task deleted.')),
-                      );
-                    },
-                  ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    User? routeUser;
-    if (args is User) {
-      routeUser = args;
-    } else if (args is Map) {
-      if (args['user'] is User) routeUser = args['user'] as User;
-      if (args['taskId'] != null) _pendingTaskId = args['taskId'].toString();
-    }
-    final effectiveUser = widget.user ?? routeUser;
     final firestore = Provider.of<FirestoreTaskService>(context);
+    final effectiveUser = widget.user;
 
     final monthYear =
         '${_getMonthName(_currentDisplayedDate.month)} ${_currentDisplayedDate.year}';
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: widget.showBackButton
             ? IconButton(
@@ -452,6 +157,7 @@ class _TasksScreenState extends State<TasksScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 100), // Spacing for extendBodyBehindAppBar
           // Date Selector (Infinite Scroll)
           Container(
             height: 100, // Increased height to prevent overflow
@@ -643,6 +349,8 @@ class _TasksScreenState extends State<TasksScreen> {
                 }
 
                 final userTasks = allTasks.where((task) {
+                  // For professors, show tasks they created OR tasks assigned to them
+                  // For students/others, show tasks assigned to them or created by them
                   final matchesUser =
                       task.assignees.contains(effectiveUser.id) ||
                       task.creator == effectiveUser.id;
@@ -717,8 +425,23 @@ class _TasksScreenState extends State<TasksScreen> {
                       );
                     });
                   }
-                  _pendingTaskId = null;
+                  // Clear pending task id
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _pendingTaskId = null;
+                  });
                 }
+
+                // Sort: Bookmarked first, then by Due Date (soonest first)
+                userTasks.sort((a, b) {
+                  final isBookmarkedA =
+                      a.bookmarkedBy?.contains(effectiveUser.id) ?? false;
+                  final isBookmarkedB =
+                      b.bookmarkedBy?.contains(effectiveUser.id) ?? false;
+
+                  if (isBookmarkedA && !isBookmarkedB) return -1;
+                  if (!isBookmarkedA && isBookmarkedB) return 1;
+                  return a.dueDate.compareTo(b.dueDate);
+                });
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -738,6 +461,196 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showTaskActionsSheet(
+    BuildContext screenContext,
+    Task task,
+    TaskService taskService,
+    User? effectiveUser,
+  ) {
+    showModalBottomSheet(
+      context: screenContext,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final statusLower = task.status.toLowerCase();
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  task.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              if (statusLower == 'rejected')
+                ListTile(
+                  leading: const Icon(
+                    Icons.report_problem,
+                    color: Colors.orange,
+                  ),
+                  title: const Text('View Rejection Reason'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    showDialog<void>(
+                      context: screenContext,
+                      builder: (ctx) {
+                        return AlertDialog(
+                          title: const Text('Rejection Reason'),
+                          content: Text(
+                            task.rejectionReason ?? 'No reason provided.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                )
+              else ...[
+                // Action: Submit Task (Students only)
+                if (effectiveUser?.role != 'admin' &&
+                    effectiveUser?.role != 'professor')
+                  ListTile(
+                    leading: const Icon(Icons.upload_file, color: Colors.blue),
+                    title: const Text('Submit Task'),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      Navigator.push(
+                        screenContext,
+                        MaterialPageRoute(
+                          builder: (context) => TaskSubmissionScreen(
+                            task: task,
+                            user: widget.user!,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                // Action: View Submission / Grade
+                if (statusLower == 'pending' ||
+                    statusLower == 'approved' ||
+                    statusLower == 'completed' ||
+                    statusLower == 'resubmitted' ||
+                    (effectiveUser?.role == 'professor' &&
+                        (task.submissions?.isNotEmpty ?? false)))
+                  ListTile(
+                    leading: const Icon(Icons.visibility, color: Colors.blue),
+                    title: Text(
+                      effectiveUser?.role == 'professor'
+                          ? 'View & Grade'
+                          : 'View Submission',
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+
+                      if (effectiveUser?.role == 'professor') {
+                        // Professor View: Show list of submissions
+                        final submissions = task.submissions ?? {};
+                        if (submissions.isEmpty) {
+                          ScaffoldMessenger.of(screenContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('No submissions yet.'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        showDialog(
+                          context: screenContext,
+                          builder: (dialogContext) => AlertDialog(
+                            title: const Text('Submissions'),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: submissions.length,
+                                itemBuilder: (context, index) {
+                                  final studentId = submissions.keys.elementAt(
+                                    index,
+                                  );
+                                  final studentName =
+                                      _userCache[studentId]?.name ?? studentId;
+
+                                  final hasGrade =
+                                      task.grades != null &&
+                                      task.grades!.containsKey(studentId);
+
+                                  return ListTile(
+                                    title: Text(studentName),
+                                    subtitle: Text(
+                                      hasGrade ? 'Graded' : 'Pending Grade',
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.arrow_forward_ios,
+                                      size: 16,
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(
+                                        dialogContext,
+                                      ); // Close LIST dialog
+                                      final urls = submissions[studentId]!;
+                                      _showGradingDialog(
+                                        screenContext,
+                                        task,
+                                        studentId,
+                                        urls,
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogContext),
+                                child: const Text('Close'),
+                              ),
+                            ],
+                          ),
+                        );
+                      } else {
+                        // Student View: Show my submission
+                        if (effectiveUser != null &&
+                            task.submissions != null &&
+                            task.submissions!.containsKey(effectiveUser.id)) {
+                          final myUrls = task.submissions![effectiveUser.id]!;
+                          _showGradingDialog(
+                            screenContext,
+                            task,
+                            effectiveUser.id,
+                            myUrls,
+                          );
+                        } else {
+                          ScaffoldMessenger.of(screenContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('No submission found for you.'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                  ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -846,12 +759,26 @@ class _TasksScreenState extends State<TasksScreen> {
                               ),
                             ),
                           ),
-                          if (isBookmarked)
-                            const Icon(
-                              Icons.bookmark,
-                              color: Colors.blue,
-                              size: 20,
+                          IconButton(
+                            icon: Icon(
+                              isBookmarked
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              color: isBookmarked ? Colors.blue : Colors.grey,
+                              size: 24,
                             ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () async {
+                              if (effectiveUser == null) return;
+                              await taskService.toggleBookmark(
+                                task.id,
+                                effectiveUser.id,
+                                !isBookmarked,
+                              );
+                            },
+                          ),
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -873,7 +800,6 @@ class _TasksScreenState extends State<TasksScreen> {
                           ),
                         ],
                       ),
-                      // Creator Name
                       // Creator Name
                       if ((task.creator?.isNotEmpty ?? false) &&
                           _userCache.containsKey(task.creator))
@@ -1140,5 +1066,243 @@ class _TasksScreenState extends State<TasksScreen> {
 
   String _formatDateDay(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')} ${_getMonthName(date.month).substring(0, 3)}';
+  }
+
+  void _showGradingDialog(
+    BuildContext context,
+    Task task,
+    String studentId,
+    List<String> submissionUrls,
+  ) {
+    final scoreController = TextEditingController();
+    final maxScoreController = TextEditingController();
+    final commentController = TextEditingController();
+
+    // Pre-fill if already graded
+    if (task.grades != null && task.grades!.containsKey(studentId)) {
+      final existing = task.grades![studentId]!;
+      scoreController.text = existing.score.toString();
+      maxScoreController.text = existing.maxScore.toString();
+      commentController.text = existing.comment ?? '';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Grade Submission'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Submission Links & Previews
+              const Text(
+                'Documents:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...submissionUrls.map((url) {
+                final isImage = _isImage(url);
+                final fileName = url.split('/').last.split('?').first;
+                final shortName = fileName.length > 30
+                    ? '${fileName.substring(0, 30)}...'
+                    : fileName;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isImage ? Icons.image : Icons.insert_drive_file,
+                            color: isImage ? Colors.purple : Colors.blue,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              shortName,
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Download/Open Button
+                          IconButton(
+                            icon: const Icon(Icons.download_rounded, size: 20),
+                            color: Colors.grey[700],
+                            tooltip: 'Download / Open',
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(),
+                            onPressed: () async {
+                              try {
+                                final downloadUrl = _getDownloadUrl(url);
+                                final uri = Uri.parse(downloadUrl);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(
+                                    uri,
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                }
+                              } catch (_) {}
+                            },
+                          ),
+                        ],
+                      ),
+                      if (isImage) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => Dialog(
+                                backgroundColor: Colors.transparent,
+                                insetPadding: EdgeInsets.zero,
+                                child: Stack(
+                                  children: [
+                                    InteractiveViewer(
+                                      child: Image.network(
+                                        url,
+                                        fit: BoxFit.contain,
+                                        height: double.infinity,
+                                        width: double.infinity,
+                                        loadingBuilder: (ctx, child, progress) {
+                                          if (progress == null) return child;
+                                          return Center(
+                                            child: CircularProgressIndicator(
+                                              value:
+                                                  progress.expectedTotalBytes !=
+                                                      null
+                                                  ? progress.cumulativeBytesLoaded /
+                                                        progress
+                                                            .expectedTotalBytes!
+                                                  : null,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    Positioned(
+                                      top: 40,
+                                      right: 20,
+                                      child: IconButton(
+                                        icon: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 30,
+                                        ),
+                                        onPressed: () => Navigator.pop(context),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              url,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (ctx, error, stack) => Container(
+                                height: 150,
+                                color: Colors.grey[200],
+                                alignment: Alignment.center,
+                                child: const Text('Image Error'),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+
+              TextField(
+                controller: scoreController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Score'),
+              ),
+              TextField(
+                controller: maxScoreController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Max Score'),
+              ),
+              TextField(
+                controller: commentController,
+                decoration: const InputDecoration(
+                  labelText: 'Comments/Feedback',
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final score = double.tryParse(scoreController.text);
+              final maxScore = double.tryParse(maxScoreController.text);
+
+              if (score == null || maxScore == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid numbers')),
+                );
+                return;
+              }
+
+              final grade = Grade(
+                score: score,
+                maxScore: maxScore,
+                comment: commentController.text,
+                gradedBy: widget.user!.id,
+                gradedAt: DateTime.now(),
+              );
+
+              final firestore = Provider.of<FirestoreTaskService>(
+                context,
+                listen: false,
+              );
+              await firestore.gradeTask(task.id, studentId, grade);
+
+              if (!context.mounted) return;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Grade saved!')));
+            },
+            child: const Text('Save Grade'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getDownloadUrl(String url) {
+    if (url.contains('cloudinary.com') && url.contains('/upload/')) {
+      return url.replaceFirst('/upload/', '/upload/fl_attachment/');
+    }
+    return url;
+  }
+
+  bool _isImage(String url) {
+    final lower = url.toLowerCase().split('?').first;
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif');
   }
 }

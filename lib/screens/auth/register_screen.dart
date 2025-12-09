@@ -469,14 +469,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Terms and Conditions'),
         content: const SingleChildScrollView(
-          child: Text(
-            '1. Use responsibly.\n2. Respect others.\n3. Data privacy policy applies.\n...',
-          ),
+          child: Text('''
+1. **Acceptance of Terms**
+By accessing and using KeiTask, you accept and agree to be bound by the terms and provision of this agreement.
+
+2. **User Responsibilities**
+- You agree to use the application for educational and task management purposes only.
+- You are responsible for maintaining the confidentiality of your account and password.
+- You agree not to upload harmful, offensive, or illegal content.
+
+3. **Professor Accounts**
+- Professor accounts require administrative verification.
+- Professors are responsible for accurate grading and task assignment.
+- Abuse of professor privileges may result in account revocation.
+
+4. **Data Privacy**
+- We collect only necessary data (name, email, birthday) to function.
+- Your data is stored securely and is not sold to third parties.
+
+5. **Code of Conduct**
+- Treat all users with respect.
+- Harassment or bullying will result in an immediate ban.
+
+6. **Termination**
+- We reserve the right to terminate or suspend access to our service immediately, without prior notice or liability, for any reason whatsoever.
+            ''', style: TextStyle(fontSize: 14)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: const Text('I Understand'),
           ),
         ],
       ),

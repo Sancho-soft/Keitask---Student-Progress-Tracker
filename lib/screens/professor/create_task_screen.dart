@@ -2,9 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../models/user_model.dart' as app_models;
-import '../../../services/firestore_task_service.dart';
-import '../../../services/auth_service.dart';
+import '../../models/user_model.dart' as app_models;
+import '../../services/firestore_task_service.dart';
+import '../../services/auth_service.dart';
 
 class CreateTaskScreen extends StatefulWidget {
   final bool adminCreate;
@@ -37,9 +37,14 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   bool _assignToAll = false;
   bool _isCreating = false;
 
+  late Stream<List<app_models.User>> _usersStream;
+
   @override
   void initState() {
     super.initState();
+    final authService = Provider.of<AuthService>(context, listen: false);
+    _usersStream = authService.getAllUsersStream();
+
     if (widget.initialAssignees != null &&
         widget.initialAssignees!.isNotEmpty) {
       _selectedAssigneeIds.addAll(widget.initialAssignees!);
@@ -223,7 +228,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   @override
   Widget build(BuildContext context) {
     // Fetch Firebase users from AuthService
-    final authService = Provider.of<AuthService>(context);
+
     final args = ModalRoute.of(context)?.settings.arguments;
     app_models.User? user = widget.user;
     bool adminCreate = widget.adminCreate;
@@ -255,7 +260,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         elevation: 0,
       ),
       body: StreamBuilder<List<app_models.User>>(
-        stream: authService.getAllUsersStream(),
+        stream: _usersStream,
         builder: (context, snapshot) {
           // Filter out admin users, professors, and the current user
           final assignableUsers = (snapshot.data ?? [])
@@ -526,33 +531,43 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 ],
                 const SizedBox(height: 24),
 
-                // Time & Date Pickers
+                // Date & Time Selection
+                const SizedBox(height: 16),
                 _buildLabel('Due Date & Time'),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildDateTimePickerBox(
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withAlpha(10),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.fromBorderSide(
+                      BorderSide(color: Colors.blue.withAlpha(50)),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildDateTimePickerRow(
                         context,
+                        title: 'Select Date',
+                        value:
+                            '${_selectedDate.day} ${_getMonthName(_selectedDate.month).substring(0, 3)} ${_selectedDate.year}',
+                        icon: Icons.calendar_today_rounded,
                         onTap: () => _selectDate(context),
-                        icon: Icons.calendar_today,
-                        text:
-                            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                        label: 'Date',
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildDateTimePickerBox(
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(height: 1),
+                      ),
+                      _buildDateTimePickerRow(
                         context,
+                        title: 'Select Time',
+                        value: _selectedTime.format(context),
+                        icon: Icons.access_time_rounded,
                         onTap: () => _selectTime(context),
-                        icon: Icons.access_time,
-                        text: _selectedTime.format(context),
-                        label: 'Time',
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
                 // Create Button
                 SizedBox(
@@ -562,7 +577,8 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                     onPressed: _isCreating ? null : _createTask,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
-                      elevation: 2,
+                      elevation: 4,
+                      shadowColor: Colors.blue.withAlpha(100),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -584,6 +600,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
+                              letterSpacing: 0.5,
                             ),
                           ),
                   ),
@@ -593,6 +610,90 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  // Helper method for month name
+  String _getMonthName(int month) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return months[month - 1];
+  }
+
+  Widget _buildDateTimePickerRow(
+    BuildContext context, {
+    required String title,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withAlpha(20),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: Colors.blue, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: Colors.grey[400],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -641,57 +742,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 12,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDateTimePickerBox(
-    BuildContext context, {
-    required VoidCallback onTap,
-    required IconData icon,
-    required String text,
-    String? label,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (label != null) ...[
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-            Row(
-              children: [
-                Icon(icon, size: 20, color: Colors.blue),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

@@ -1131,6 +1131,12 @@ class ProfileScreen extends StatelessWidget {
           ),
           TextButton(
             onPressed: () {
+              // Reset theme to light mode before logging out
+              Provider.of<ThemeService>(
+                context,
+                listen: false,
+              ).setThemeMode(ThemeMode.light);
+
               Navigator.pop(context);
               Navigator.of(
                 context,

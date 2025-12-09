@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../tasks/create_task_screen.dart';
+import '../professor/create_task_screen.dart';
 import '../../widgets/flash_message.dart';
 import 'package:intl/intl.dart';
 
@@ -256,6 +256,17 @@ class _UsersScreenState extends State<UsersScreen> {
                           },
                         ),
                         const SizedBox(width: 8),
+                        _buildFilterChip(
+                          'Pending',
+                          _roleFilter == 'pending' && !_showBanned,
+                          () {
+                            setState(() {
+                              _roleFilter = 'pending'; // New filter logic
+                              _showBanned = false;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
                         FilterChip(
                           label: const Text('Banned Users'),
                           selected: _showBanned,
@@ -330,13 +341,16 @@ class _UsersScreenState extends State<UsersScreen> {
                     }
                   } else if (_roleFilter == 'professor') {
                     if (user.role != 'professor') return false;
+                  } else if (_roleFilter == 'pending') {
+                    if (user.role == 'professor' && !user.isApproved) {
+                      return true;
+                    }
+                    return false;
                   }
 
                   // 4. Professor Approval Logic
-                  // Unapproved professors should NOT appear in Manage Users (unless specific state, but prompt says not to show)
-                  if (user.role == 'professor' && !user.isApproved) {
-                    return false;
-                  }
+                  // We SHOULD show unapproved professors so admins can approve them
+                  // Unless filtered out by role
 
                   return true;
                 }).toList();
@@ -752,6 +766,70 @@ class _UsersScreenState extends State<UsersScreen> {
                                       ),
                                     ),
                                   ),
+
+                                  if (user.role == 'professor') ...[
+                                    const SizedBox(height: 6),
+                                    GestureDetector(
+                                      onTap: () async {
+                                        final isApproved = user.isApproved;
+                                        try {
+                                          await authService.updateUserApproval(
+                                            user.id,
+                                            !isApproved,
+                                          );
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                !isApproved
+                                                    ? 'Professor approved'
+                                                    : 'Professor access revoked',
+                                              ),
+                                              backgroundColor: !isApproved
+                                                  ? Colors.green
+                                                  : Colors.orange,
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: user.isApproved
+                                              ? Colors.orange
+                                              : Colors.green,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          user.isApproved
+                                              ? 'REVOKE ACCESS'
+                                              : 'APPROVE NOW',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

@@ -10,7 +10,7 @@ import '../../models/user_model.dart'
 // Actually Task is in user_model.dart?? No, I saw it there. Yes, Task class is in user_model.dart.
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import '../admin/admin_reports_screen.dart'; // Reports Inbox
+import 'admin_reports_screen.dart'; // Reports Inbox
 
 class AdminDashboard extends StatefulWidget {
   final User user;
@@ -34,8 +34,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
         listen: false,
       );
     } catch (e) {
+      debugPrint('Notification Service Provider Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification service not available')),
+        const SnackBar(
+          content: Text('Notification service unavailable (Check logs)'),
+        ),
       );
       return;
     }
@@ -120,14 +123,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Blue Header Section
+                  // Blue Header Section with Gradient
                   Container(
                     width: double.infinity,
-                    color: Colors.blue,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 20,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          const Color(0xFF1565C0), // Blue 800
+                          const Color(0xFF1E88E5), // Blue 600
+                          const Color(0xFF42A5F5), // Blue 400
+                        ],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withAlpha(50),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
                     ),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -138,17 +159,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               Text(
                                 'Hi, ${widget.user.name}!',
                                 style: const TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 26,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Overview of system users.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white70,
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withAlpha(50),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'System Administrator',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                             ],
@@ -156,45 +189,59 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ),
                         Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.inbox,
-                                color: Colors.white,
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(30),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AdminReportsScreen(),
-                                  ),
-                                );
-                              },
-                              tooltip: 'Reports Inbox',
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.inbox_rounded,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const AdminReportsScreen(),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'Reports Inbox',
+                              ),
                             ),
-                            const SizedBox(width: 8),
-                            CircleAvatar(
-                              radius: 28,
-                              backgroundColor: Colors.white,
-                              backgroundImage:
-                                  (widget.user.profileImage != null &&
-                                      widget.user.profileImage!.isNotEmpty)
-                                  ? NetworkImage(widget.user.profileImage!)
-                                        as ImageProvider
-                                  : null,
-                              child:
-                                  (widget.user.profileImage == null ||
-                                      widget.user.profileImage!.isEmpty)
-                                  ? Text(
-                                      widget.user.name.isNotEmpty
-                                          ? widget.user.name[0].toUpperCase()
-                                          : 'A',
-                                      style: const TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                      ),
-                                    )
-                                  : null,
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: CircleAvatar(
+                                radius: 26,
+                                backgroundColor: Colors.blue[100],
+                                backgroundImage:
+                                    (widget.user.profileImage != null &&
+                                        widget.user.profileImage!.isNotEmpty)
+                                    ? NetworkImage(widget.user.profileImage!)
+                                          as ImageProvider
+                                    : null,
+                                child:
+                                    (widget.user.profileImage == null ||
+                                        widget.user.profileImage!.isEmpty)
+                                    ? Text(
+                                        widget.user.name.isNotEmpty
+                                            ? widget.user.name[0].toUpperCase()
+                                            : 'A',
+                                        style: TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue[800],
+                                        ),
+                                      )
+                                    : null,
+                              ),
                             ),
                           ],
                         ),
@@ -215,7 +262,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           physics: const NeverScrollableScrollPhysics(),
                           mainAxisSpacing: 12,
                           crossAxisSpacing: 12,
-                          childAspectRatio: 1.5,
+                          childAspectRatio: 1.25,
                           children: [
                             _buildStatCard(
                               'Total Users',
@@ -278,7 +325,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                         // User Growth Chart
                         Container(
-                          height: 300,
+                          height: 240,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Theme.of(context).cardColor,
@@ -314,7 +361,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                         // User Activity Chart (New)
                         Container(
-                          height: 300,
+                          height: 240,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Theme.of(context).cardColor,
@@ -360,7 +407,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                             }
                             final tasks = taskSnapshot.data!;
                             return Container(
-                              height: 300,
+                              height: 240,
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
                                 color: Theme.of(context).cardColor,
@@ -427,48 +474,56 @@ class _AdminDashboardState extends State<AdminDashboard> {
   ) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: backgroundColor,
-        border: Border.all(
-          color: color.withAlpha((0.2 * 255).round()),
-          width: 1,
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [backgroundColor, backgroundColor.withAlpha(200)],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withAlpha(30),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: Colors.white.withAlpha(50), width: 1),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.all(16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withAlpha((0.2 * 255).round()),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withAlpha(150),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 18),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
-                style: const TextStyle(
+                title.toUpperCase(),
+                style: TextStyle(
                   fontSize: 10,
-                  color: Colors.grey, // Adjusted primarily for readability
-                  fontWeight: FontWeight.w600, // Slightly bolder for small text
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 count,
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: color.withAlpha(230),
                 ),
               ),
             ],
@@ -481,24 +536,36 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildUserGrowthChart(List<User> users) {
     if (users.isEmpty) return const Center(child: Text('No user data'));
 
-    final validUsers = users.where((u) => u.createdAt != null).toList();
+    // Fallback: If creation date is missing, treat them as "joined today"
+    // so we can at least show the total count in the chart.
+    final List<User> processedUsers = users.map((u) {
+      if (u.createdAt == null) {
+        // Return a modified copy (conceptually) or just handle logic here
+        // We can't modify the User object easily if it's final, but we can treat the date as now.
+        return User(
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          profileImage: u.profileImage,
+          isApproved: u.isApproved,
+          createdAt: DateTime.now(), // Fallback
+          lastActive: u.lastActive,
+          phoneNumber: u.phoneNumber,
+          address: u.address,
+          isBanned: u.isBanned,
+          notificationsEnabled: u.notificationsEnabled,
+        );
+      }
+      return u;
+    }).toList();
 
-    // If we have users but no timestamps, or only 1 timestamp, we still want to show something
-    if (validUsers.isEmpty && users.isNotEmpty) {
-      return Center(
-        child: Text('Total Users: ${users.length} (No timeline data)'),
-      );
-    }
-
-    validUsers.sort((a, b) => a.createdAt!.compareTo(b.createdAt!));
+    processedUsers.sort((a, b) => a.createdAt!.compareTo(b.createdAt!));
 
     final Map<int, int> growthMap = {};
-    int count = (users.length - validUsers.length);
+    int count = 0; // Start counting from the beginning of our processed list
 
-    // Pre-calculate initial count (users with null creation date usually exist safely before)
-    // If all users have timestamps, count starts at 0.
-
-    for (var user in validUsers) {
+    for (var user in processedUsers) {
       count++;
       final date = user.createdAt!;
       final dayKey = DateTime(

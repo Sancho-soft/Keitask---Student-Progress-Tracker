@@ -3,15 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/notification_service.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
-
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
 import '../tasks/tasks_screen.dart';
 import '../profile/profile_screen.dart';
-import 'admin_dashboard.dart';
-import 'user_dashboard.dart';
-import '../tasks/admin_tasks_approval_screen.dart';
+import '../admin/admin_dashboard.dart';
+import '../professor/professor_dashboard.dart';
+import '../student/student_dashboard.dart';
+import '../admin/admin_tasks_approval_screen.dart';
 import '../admin/users_screen.dart';
 // import '../admin/task_statistics_screen.dart'; // Removed
 import '../leaderboard/leaderboard_screen.dart';
@@ -172,7 +172,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     } else if (isProfessor) {
       screens = [
-        UserDashboard(
+        ProfessorDashboard(
           user: widget.user,
           onSeeAllTasks: () => _onTabSelected(1), // Switch to Tasks tab
         ),
@@ -194,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else {
       // Student
       screens = [
-        UserDashboard(user: widget.user),
+        StudentDashboard(user: widget.user),
         TasksScreen(user: widget.user, showBackButton: false),
         const LeaderboardScreen(),
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),

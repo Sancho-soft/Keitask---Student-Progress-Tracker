@@ -130,4 +130,37 @@ class TaskService extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> toggleBookmark(String taskId, String userId, bool add) async {
+    final index = _tasks.indexWhere((t) => t.id == taskId);
+    if (index != -1) {
+      final task = _tasks[index];
+      // Note: This is a simplifield in-memory implementation.
+      // In a real app, you'd likely update a specific 'bookmarkedBy' field or similar.
+      // For now, we'll just acknowledge the call or mock it if Task model supports it.
+      // Assuming Task model has 'bookmarkedBy' list:
+      List<String> bookmarks = List.from(task.bookmarkedBy ?? []);
+      if (add) {
+        if (!bookmarks.contains(userId)) bookmarks.add(userId);
+      } else {
+        bookmarks.remove(userId);
+      }
+
+      _tasks[index] = Task(
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        assignees: task.assignees,
+        dueDate: task.dueDate,
+        creator: task.creator,
+        grades: task.grades,
+        submissions: task.submissions,
+        submissionNotes: task.submissionNotes,
+        completionStatus: task.completionStatus,
+        bookmarkedBy: bookmarks,
+      );
+      notifyListeners();
+    }
+  }
 }
