@@ -321,6 +321,15 @@ class ProfileScreen extends StatelessWidget {
                         onTap: () => _showLogoutDialog(context),
                         isDestructive: true,
                       ),
+                      const SizedBox(height: 12),
+                      _buildSettingItem(
+                        context,
+                        icon: Icons.delete_forever,
+                        label: 'Delete Account',
+                        color: Colors.red,
+                        onTap: () => _showDeleteAccountDialog(context),
+                        isDestructive: true,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 40),
@@ -1146,6 +1155,82 @@ class ProfileScreen extends StatelessWidget {
             child: const Text('Log Out', style: TextStyle(color: Colors.red)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    bool isLoading = false;
+    // For simple delete (if recently signed in), we might not need password re-entry flow
+    // unless we want to be strict. For this 'quick fix', we will try delete directly.
+    // If it fails with 'requires-recent-login', we show an error.
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text('Delete Account'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Are you sure? This action CANNOT be undone.'),
+              const SizedBox(height: 10),
+              const Text(
+                'All your data (tasks, submissions, profile) will be permanently removed.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            if (isLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+              TextButton(
+                onPressed: () async {
+                  setState(() => isLoading = true);
+                  try {
+                    await Provider.of<AuthService>(
+                      context,
+                      listen: false,
+                    ).deleteAccount();
+
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      // Navigate to splash/login
+                      Navigator.of(
+                        context,
+                      ).pushNamedAndRemoveUntil('/', (route) => false);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      setState(() => isLoading = false);
+                      Navigator.pop(context); // Close dialog
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text(
+                  'Delete Forever',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

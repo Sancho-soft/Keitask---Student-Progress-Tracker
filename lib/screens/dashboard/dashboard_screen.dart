@@ -6,12 +6,14 @@ import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
-import '../tasks/tasks_screen.dart';
+
 import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard.dart';
 import '../professor/professor_dashboard.dart';
 import '../student/student_dashboard.dart';
 import '../admin/admin_tasks_approval_screen.dart';
+import '../professor/professor_tasks_screen.dart';
+import '../student/student_tasks_screen.dart';
 import '../admin/users_screen.dart';
 // import '../admin/task_statistics_screen.dart'; // Removed
 import '../leaderboard/leaderboard_screen.dart';
@@ -176,10 +178,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           user: widget.user,
           onSeeAllTasks: () => _onTabSelected(1), // Switch to Tasks tab
         ),
-        TasksScreen(
+        ProfessorTasksScreen(
           user: widget.user,
-          showBackButton: false,
-        ), // Professor sees TasksScreen
+        ), // Professor sees ProfessorTasksScreen
         const SizedBox(), // Placeholder for "New Task" (handled in _onTabSelected)
         const LeaderboardScreen(), // Professor Leaderboard (was Analytics)
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),
@@ -195,7 +196,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Student
       screens = [
         StudentDashboard(user: widget.user),
-        TasksScreen(user: widget.user, showBackButton: false),
+        StudentTasksScreen(user: widget.user, showBackButton: false),
         const LeaderboardScreen(),
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),
       ];

@@ -8,17 +8,17 @@ import '../../services/auth_service.dart';
 import '../student/task_submission_screen.dart';
 import '../../models/grade_model.dart';
 
-class TasksScreen extends StatefulWidget {
+class StudentTasksScreen extends StatefulWidget {
   final User? user;
   final bool showBackButton;
 
-  const TasksScreen({super.key, this.user, this.showBackButton = true});
+  const StudentTasksScreen({super.key, this.user, this.showBackButton = true});
 
   @override
-  State<TasksScreen> createState() => _TasksScreenState();
+  State<StudentTasksScreen> createState() => _StudentTasksScreenState();
 }
 
-class _TasksScreenState extends State<TasksScreen> {
+class _StudentTasksScreenState extends State<StudentTasksScreen> {
   DateTime _selectedDate = DateTime.now();
   DateTime _currentDisplayedDate = DateTime.now(); // For the header
   bool _showAllTasks = false;
@@ -112,7 +112,9 @@ class _TasksScreenState extends State<TasksScreen> {
   @override
   Widget build(BuildContext context) {
     final firestore = Provider.of<FirestoreTaskService>(context);
-    final effectiveUser = widget.user;
+    // Fix: Robustly resolve user to ensure role checks work
+    final effectiveUser =
+        widget.user ?? Provider.of<AuthService>(context).appUser;
 
     final monthYear =
         '${_getMonthName(_currentDisplayedDate.month)} ${_currentDisplayedDate.year}';
@@ -520,133 +522,165 @@ class _TasksScreenState extends State<TasksScreen> {
                       },
                     );
                   },
-                )
-              else ...[
-                // Action: Submit Task (Students only)
-                if (effectiveUser?.role != 'admin' &&
-                    effectiveUser?.role != 'professor')
-                  ListTile(
-                    leading: const Icon(Icons.upload_file, color: Colors.blue),
-                    title: const Text('Submit Task'),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
-                      Navigator.push(
-                        screenContext,
+                ),
+
+              // Action: Submit Task (Students only)
+              if (effectiveUser?.role != 'admin' &&
+                  effectiveUser?.role != 'professor')
+                ListTile(
+                  leading: const Icon(Icons.upload_file, color: Colors.blue),
+                  title: Text(
+                    statusLower == 'rejected' ? 'Resubmit Task' : 'Submit Task',
+                  ),
+                  onTap: () {
+                    // Fix confirmed: Using sheetContext for robust navigation
+                    // Capture navigation and messenger from the SHEET context (stable)
+                    final nav = Navigator.of(sheetContext);
+                    final messenger = ScaffoldMessenger.of(sheetContext);
+
+                    User? safeUser = widget.user;
+                    // Use sheetContext for provider lookup as it's part of the global overlay
+                    if (safeUser == null) {
+                      try {
+                        safeUser = Provider.of<AuthService>(
+                          sheetContext,
+                          listen: false,
+                        ).appUser;
+                      } catch (e) {
+                        debugPrint('Error resolving user: $e');
+                      }
+                    }
+
+                    nav.pop(); // Close the sheet
+
+                    if (safeUser != null) {
+                      nav.push(
                         MaterialPageRoute(
-                          builder: (context) => TaskSubmissionScreen(
-                            task: task,
-                            user: widget.user!,
+                          builder: (context) =>
+                              TaskSubmissionScreen(task: task, user: safeUser!),
+                        ),
+                      );
+                    } else {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Error: User not found. Try refreshing.',
                           ),
                         ),
                       );
-                    },
+                    }
+                  },
+                ),
+
+              // Action: View Submission / Grade
+              if (statusLower == 'pending' ||
+                  statusLower == 'approved' ||
+                  statusLower == 'completed' ||
+                  statusLower == 'resubmitted' ||
+                  statusLower == 'rejected' ||
+                  (effectiveUser?.role == 'professor' &&
+                      (task.submissions?.isNotEmpty ?? false)))
+                ListTile(
+                  leading: const Icon(Icons.visibility, color: Colors.blue),
+                  title: Text(
+                    effectiveUser?.role == 'professor'
+                        ? 'View & Grade'
+                        : 'View Submission',
                   ),
+                  onTap: () {
+                    final nav = Navigator.of(sheetContext);
+                    final messenger = ScaffoldMessenger.of(sheetContext);
 
-                // Action: View Submission / Grade
-                if (statusLower == 'pending' ||
-                    statusLower == 'approved' ||
-                    statusLower == 'completed' ||
-                    statusLower == 'resubmitted' ||
-                    (effectiveUser?.role == 'professor' &&
-                        (task.submissions?.isNotEmpty ?? false)))
-                  ListTile(
-                    leading: const Icon(Icons.visibility, color: Colors.blue),
-                    title: Text(
-                      effectiveUser?.role == 'professor'
-                          ? 'View & Grade'
-                          : 'View Submission',
-                    ),
-                    onTap: () {
-                      Navigator.pop(sheetContext);
+                    nav.pop(); // Close sheet first
 
-                      if (effectiveUser?.role == 'professor') {
-                        // Professor View: Show list of submissions
-                        final submissions = task.submissions ?? {};
-                        if (submissions.isEmpty) {
-                          ScaffoldMessenger.of(screenContext).showSnackBar(
-                            const SnackBar(
-                              content: Text('No submissions yet.'),
+                    if (effectiveUser?.role == 'professor') {
+                      // Professor View: Show list of submissions
+                      final submissions = task.submissions ?? {};
+                      if (submissions.isEmpty) {
+                        messenger.showSnackBar(
+                          const SnackBar(content: Text('No submissions yet.')),
+                        );
+                        return;
+                      }
+
+                      // Use nav.context (Root Navigator context) to show dialog
+                      showDialog(
+                        context: nav.context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Submissions'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: submissions.length,
+                              itemBuilder: (context, index) {
+                                final studentId = submissions.keys.elementAt(
+                                  index,
+                                );
+                                final studentName =
+                                    _userCache[studentId]?.name ?? studentId;
+
+                                final hasGrade =
+                                    task.grades != null &&
+                                    task.grades!.containsKey(studentId);
+
+                                return ListTile(
+                                  title: Text(studentName),
+                                  subtitle: Text(
+                                    hasGrade ? 'Graded' : 'Pending Grade',
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 16,
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(
+                                      dialogContext,
+                                    ); // Close LIST dialog
+                                    final urls = submissions[studentId]!;
+                                    _showGradingDialog(
+                                      nav.context, // Use root context
+                                      task,
+                                      studentId,
+                                      urls,
+                                      effectiveUser!,
+                                    );
+                                  },
+                                );
+                              },
                             ),
-                          );
-                          return;
-                        }
-
-                        showDialog(
-                          context: screenContext,
-                          builder: (dialogContext) => AlertDialog(
-                            title: const Text('Submissions'),
-                            content: SizedBox(
-                              width: double.maxFinite,
-                              child: ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: submissions.length,
-                                itemBuilder: (context, index) {
-                                  final studentId = submissions.keys.elementAt(
-                                    index,
-                                  );
-                                  final studentName =
-                                      _userCache[studentId]?.name ?? studentId;
-
-                                  final hasGrade =
-                                      task.grades != null &&
-                                      task.grades!.containsKey(studentId);
-
-                                  return ListTile(
-                                    title: Text(studentName),
-                                    subtitle: Text(
-                                      hasGrade ? 'Graded' : 'Pending Grade',
-                                    ),
-                                    trailing: const Icon(
-                                      Icons.arrow_forward_ios,
-                                      size: 16,
-                                    ),
-                                    onTap: () {
-                                      Navigator.pop(
-                                        dialogContext,
-                                      ); // Close LIST dialog
-                                      final urls = submissions[studentId]!;
-                                      _showGradingDialog(
-                                        screenContext,
-                                        task,
-                                        studentId,
-                                        urls,
-                                      );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: const Text('Close'),
-                              ),
-                            ],
                           ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('Close'),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      // Student View: Show my submission
+                      if (effectiveUser != null &&
+                          task.submissions != null &&
+                          task.submissions!.containsKey(effectiveUser.id)) {
+                        final myUrls = task.submissions![effectiveUser.id]!;
+                        _showGradingDialog(
+                          nav.context, // Use root context
+                          task,
+                          effectiveUser.id,
+                          myUrls,
+                          effectiveUser!,
                         );
                       } else {
-                        // Student View: Show my submission
-                        if (effectiveUser != null &&
-                            task.submissions != null &&
-                            task.submissions!.containsKey(effectiveUser.id)) {
-                          final myUrls = task.submissions![effectiveUser.id]!;
-                          _showGradingDialog(
-                            screenContext,
-                            task,
-                            effectiveUser.id,
-                            myUrls,
-                          );
-                        } else {
-                          ScaffoldMessenger.of(screenContext).showSnackBar(
-                            const SnackBar(
-                              content: Text('No submission found for you.'),
-                            ),
-                          );
-                        }
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('No submission found for you.'),
+                          ),
+                        );
                       }
-                    },
-                  ),
-              ],
+                    }
+                  },
+                ),
             ],
           ),
         );
@@ -1073,26 +1107,31 @@ class _TasksScreenState extends State<TasksScreen> {
     Task task,
     String studentId,
     List<String> submissionUrls,
+    User viewer,
   ) {
     final scoreController = TextEditingController();
     final maxScoreController = TextEditingController();
     final commentController = TextEditingController();
 
     // Pre-fill if already graded
+    Grade? existingGrade;
     if (task.grades != null && task.grades!.containsKey(studentId)) {
-      final existing = task.grades![studentId]!;
-      scoreController.text = existing.score.toString();
-      maxScoreController.text = existing.maxScore.toString();
-      commentController.text = existing.comment ?? '';
+      existingGrade = task.grades![studentId]!;
+      scoreController.text = existingGrade.score.toString();
+      maxScoreController.text = existingGrade.maxScore.toString();
+      commentController.text = existingGrade.comment ?? '';
     }
+
+    final isProfessor = viewer.role == 'professor';
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Grade Submission'),
+        title: Text(isProfessor ? 'Grade Submission' : 'Submission Details'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Submission Links & Previews
               const Text(
@@ -1100,6 +1139,11 @@ class _TasksScreenState extends State<TasksScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
+              if (submissionUrls.isEmpty)
+                const Text(
+                  'No documents submitted.',
+                  style: TextStyle(fontStyle: FontStyle.italic),
+                ),
               ...submissionUrls.map((url) {
                 final isImage = _isImage(url);
                 final fileName = url.split('/').last.split('?').first;
@@ -1226,65 +1270,91 @@ class _TasksScreenState extends State<TasksScreen> {
               }),
               const SizedBox(height: 16),
 
-              TextField(
-                controller: scoreController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Score'),
-              ),
-              TextField(
-                controller: maxScoreController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Max Score'),
-              ),
-              TextField(
-                controller: commentController,
-                decoration: const InputDecoration(
-                  labelText: 'Comments/Feedback',
+              // Grading Section
+              if (isProfessor) ...[
+                const Divider(),
+                const Text(
+                  'Grading',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                maxLines: 2,
-              ),
+                TextField(
+                  controller: scoreController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Score'),
+                ),
+                TextField(
+                  controller: maxScoreController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Max Score'),
+                ),
+                TextField(
+                  controller: commentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Comments/Feedback',
+                  ),
+                  maxLines: 2,
+                ),
+              ] else if (existingGrade != null) ...[
+                // Student View (Read Only)
+                const Divider(),
+                const Text(
+                  'Grade Details',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Score: ${existingGrade.score} / ${existingGrade.maxScore}',
+                ),
+                if (existingGrade.comment != null &&
+                    existingGrade.comment!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text('Feedback: ${existingGrade.comment}'),
+                  ),
+              ],
             ],
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Close'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final score = double.tryParse(scoreController.text);
-              final maxScore = double.tryParse(maxScoreController.text);
+          if (isProfessor)
+            ElevatedButton(
+              onPressed: () async {
+                final score = double.tryParse(scoreController.text);
+                final maxScore = double.tryParse(maxScoreController.text);
 
-              if (score == null || maxScore == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invalid numbers')),
+                if (score == null || maxScore == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid numbers')),
+                  );
+                  return;
+                }
+
+                final grade = Grade(
+                  score: score,
+                  maxScore: maxScore,
+                  comment: commentController.text,
+                  gradedBy: viewer.id,
+                  gradedAt: DateTime.now(),
                 );
-                return;
-              }
 
-              final grade = Grade(
-                score: score,
-                maxScore: maxScore,
-                comment: commentController.text,
-                gradedBy: widget.user!.id,
-                gradedAt: DateTime.now(),
-              );
+                final firestore = Provider.of<FirestoreTaskService>(
+                  context,
+                  listen: false,
+                );
+                await firestore.gradeTask(task.id, studentId, grade);
 
-              final firestore = Provider.of<FirestoreTaskService>(
-                context,
-                listen: false,
-              );
-              await firestore.gradeTask(task.id, studentId, grade);
-
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Grade saved!')));
-            },
-            child: const Text('Save Grade'),
-          ),
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Grade saved!')));
+              },
+              child: const Text('Save Grade'),
+            ),
         ],
       ),
     );
