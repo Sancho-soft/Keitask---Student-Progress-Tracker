@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
-// Unused imports removed
 import 'professor_task_detail_screen.dart'; // We will create this next
 
 class ProfessorTasksScreen extends StatefulWidget {

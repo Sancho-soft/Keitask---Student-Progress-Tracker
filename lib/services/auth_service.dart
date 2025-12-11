@@ -634,4 +634,27 @@ class AuthService extends ChangeNotifier {
     final snap = await _firestore.collection('users').get();
     return snap.docs.map((d) => app_models.User.fromJson(d.data())).toList();
   }
+
+  Future<void> deleteAccount() async {
+    try {
+      if (firebaseUser == null) throw 'No user signed in';
+      final uid = firebaseUser!.uid;
+
+      // Delete user data from Firestore
+      await _firestore.collection('users').doc(uid).delete();
+
+      // Delete user from Firebase Auth
+      await firebaseUser!.delete();
+
+      // Cleanup local state
+      appUser = null;
+      firebaseUser = null;
+      notifyListeners();
+    } catch (e) {
+      if (e.toString().contains('requires-recent-login')) {
+        throw 'Security-Check: Please log out and log back in to delete your account.';
+      }
+      rethrow;
+    }
+  }
 }
