@@ -102,7 +102,7 @@ class AuthService extends ChangeNotifier {
           id: uid,
           email: firebaseUser?.email ?? '',
           name: firebaseUser?.displayName ?? '',
-          role: 'user',
+          role: 'student',
           isApproved: true,
           createdAt: firebaseUser?.metadata.creationTime, // Use Auth metadata
         );
@@ -340,21 +340,32 @@ class AuthService extends ChangeNotifier {
       final uid = fbUser.uid;
       final userDoc = await _firestore.collection('users').doc(uid).get();
       if (userDoc.exists) {
-        // Update displayName/photo if changed
+        // Update displayName/photo ONLY if they are missing in our DB
+        // This prevents overwriting custom changes the user made.
         final data = userDoc.data()!;
         final existing = app_models.User.fromJson(data);
-        final displayName = fbUser.displayName ?? existing.name;
-        final photoUrl = fbUser.photoURL ?? existing.profileImage;
-        await _firestore.collection('users').doc(uid).update({
-          'name': displayName,
-          'profileImage': photoUrl,
-        });
+
+        final String newName = (existing.name.isEmpty)
+            ? (fbUser.displayName ?? '')
+            : existing.name;
+
+        final String? newImage =
+            (existing.profileImage == null || existing.profileImage!.isEmpty)
+            ? fbUser.photoURL
+            : existing.profileImage;
+
+        if (newName != existing.name || newImage != existing.profileImage) {
+          await _firestore.collection('users').doc(uid).update({
+            'name': newName,
+            'profileImage': newImage,
+          });
+        }
       } else {
         final newUser = app_models.User(
           id: uid,
           email: fbUser.email ?? '',
           name: fbUser.displayName ?? '',
-          role: 'user',
+          role: 'student',
           profileImage: fbUser.photoURL,
           isApproved: true,
           isBanned: false,

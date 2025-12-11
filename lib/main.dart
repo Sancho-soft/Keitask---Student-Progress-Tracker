@@ -12,7 +12,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart'; // Ensure this path is correct
 import 'screens/auth/register_screen.dart'; // Ensure this path is correct
 import 'screens/professor/create_task_screen.dart';
-import 'screens/tasks/tasks_screen.dart';
+import 'screens/student/student_tasks_screen.dart';
 import 'screens/admin/users_screen.dart';
 import 'services/task_service.dart'; // NEW IMPORT
 import 'models/user_model.dart'; // For type checking in routes
@@ -230,17 +230,17 @@ class MyApp extends StatelessWidget {
         '/tasks': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           if (args is User) {
-            return TasksScreen(user: args);
+            return StudentTasksScreen(user: args);
           }
           if (args is Map && args['user'] is User) {
-            return TasksScreen(user: args['user'] as User);
+            return StudentTasksScreen(user: args['user'] as User);
           }
           // As a fallback, use currently signed in user from AuthService
           final currentUser = Provider.of<AuthService>(
             context,
             listen: false,
           ).appUser;
-          if (currentUser != null) return TasksScreen(user: currentUser);
+          if (currentUser != null) return StudentTasksScreen(user: currentUser);
           // If no user, navigate to Login - empty placeholder
           return const LoginScreen();
         },

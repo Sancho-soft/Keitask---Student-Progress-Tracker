@@ -8,6 +8,7 @@ class StorageService {
   Future<String?> uploadFile(
     File file, {
     void Function(double progress)? onProgress,
+    String? folder,
   }) async {
     // Try Cloudinary upload first. Configure these values accordingly.
     const envCloudName = String.fromEnvironment(
@@ -66,6 +67,9 @@ class StorageService {
 
         final request = http.MultipartRequest('POST', uri);
         request.fields['upload_preset'] = uploadPreset;
+        if (folder != null && folder.isNotEmpty) {
+          request.fields['folder'] = folder;
+        }
         request.files.add(multipartFile);
 
         final streamed = await request.send();

@@ -372,61 +372,88 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     ),
                   ),
 
-                  // --- Status Cards Grid ---
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.25,
+                  // --- Status Cards Layout ---
+                  Column(
                     children: [
-                      // 1. Assigned
-                      _buildStatCard(
-                        stat1Label,
-                        '$stat1Count',
-                        stat1Color.withAlpha(50),
-                        stat1Color,
-                        stat1Icon,
+                      // Row 1: Assigned & Pending
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AspectRatio(
+                              aspectRatio: 1.25,
+                              child: _buildStatCard(
+                                stat1Label,
+                                '$stat1Count',
+                                stat1Color.withAlpha(50),
+                                stat1Color,
+                                stat1Icon,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AspectRatio(
+                              aspectRatio: 1.25,
+                              child: _buildStatCard(
+                                stat2Label,
+                                '$stat2Count',
+                                stat2Color.withAlpha(50),
+                                stat2Color,
+                                stat2Icon,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      // 2. Pending
-                      _buildStatCard(
-                        stat2Label,
-                        '$stat2Count',
-                        stat2Color.withAlpha(50),
-                        stat2Color,
-                        stat2Icon,
+                      const SizedBox(height: 12),
+                      // Row 2: Rejected & Resubmitted
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AspectRatio(
+                              aspectRatio: 1.25,
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _showRejectedTasks(context, myTasks),
+                                child: _buildStatCard(
+                                  'Rejected',
+                                  '$rejectedCount',
+                                  Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.red.withAlpha(50)
+                                      : const Color(0xFFFFEBEE),
+                                  Colors.red,
+                                  Icons.cancel,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AspectRatio(
+                              aspectRatio: 1.25,
+                              child: _buildStatCard(
+                                'Resubmitted',
+                                '$resubmittedCount',
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.purple.withAlpha(50)
+                                    : const Color(0xFFF3E5F5),
+                                Colors.purple,
+                                Icons.refresh,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      // 3. Completed
-                      _buildStatCard(
+                      const SizedBox(height: 12),
+                      // Row 3: Completed (Full Width)
+                      // Row 3: Completed (Full Width)
+                      _buildWideStatCard(
                         stat3Label,
                         '$stat3Count',
                         stat3Color.withAlpha(50),
                         stat3Color,
                         stat3Icon,
-                      ),
-                      // 4. Rejected (Clickable)
-                      GestureDetector(
-                        onTap: () => _showRejectedTasks(context, myTasks),
-                        child: _buildStatCard(
-                          'Rejected',
-                          '$rejectedCount',
-                          Theme.of(context).brightness == Brightness.dark
-                              ? Colors.red.withAlpha(50)
-                              : const Color(0xFFFFEBEE),
-                          Colors.red,
-                          Icons.cancel,
-                        ),
-                      ),
-                      // 5. Resubmitted
-                      _buildStatCard(
-                        'Resubmitted',
-                        '$resubmittedCount',
-                        Theme.of(context).brightness == Brightness.dark
-                            ? Colors.purple.withAlpha(50)
-                            : const Color(0xFFF3E5F5),
-                        Colors.purple,
-                        Icons.refresh,
                       ),
                     ],
                   ),
@@ -730,6 +757,68 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   color: Colors.grey,
                 ),
                 overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideStatCard(
+    String title,
+    String count,
+    Color bgColor,
+    Color textColor,
+    IconData icon,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(
+              Theme.of(context).brightness == Brightness.dark ? 50 : 10,
+            ),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: textColor, size: 32),
+          ),
+          const SizedBox(width: 24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                count,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
               ),
             ],
           ),

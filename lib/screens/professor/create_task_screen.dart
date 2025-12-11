@@ -1,6 +1,7 @@
 // keitask_management/lib/screens/auth/tasks/create_task_screen.dart (UPDATED - Uses Firebase Users)
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart' as app_models;
 import '../../services/firestore_task_service.dart';
@@ -57,24 +58,128 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   // --- Date/Time Selection and Task Creation Logic (Omitting for brevity, remains the same) ---
 
   Future<void> _selectDate(BuildContext context) async {
+    final now = DateTime.now();
+    // Allow today by resetting time to midnight for the start range
+    final firstDate = DateTime(now.year, now.month, now.day);
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2026),
+      initialDate: _selectedDate.isBefore(firstDate)
+          ? firstDate
+          : _selectedDate,
+      firstDate: firstDate,
+      lastDate: DateTime(2030), // Extended range
     );
+
     if (picked != null && picked != _selectedDate) {
       setState(() => _selectedDate = picked);
+
+      // Post-check: If they switched to Today, and the current _selectedTime is already passed,
+      // warn them or let the _createTask validation handle it?
+      // Better UX: check immediately.
+      if (picked.year == now.year &&
+          picked.month == now.month &&
+          picked.day == now.day) {
+        final currentMinutes = now.hour * 60 + now.minute;
+        final selectedMinutes = _selectedTime.hour * 60 + _selectedTime.minute;
+        if (selectedMinutes <= currentMinutes) {
+          _showSnackBar(
+            'Note: Selected time is in the past. Please update time.',
+            Colors.orange,
+          );
+          // Optional: Auto-bump time?
+          // setState(() => _selectedTime = TimeOfDay.fromDateTime(now.add(Duration(minutes: 5))));
+        }
+      }
     }
   }
 
   Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime,
+    // Current selected combined DateTime
+    DateTime initialDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _selectedTime.hour,
+      _selectedTime.minute,
     );
-    if (picked != null && picked != _selectedTime) {
-      setState(() => _selectedTime = picked);
+
+    // We update this temporary variable as the user scrolls
+    DateTime tempPickedDateTime = initialDateTime;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext builder) {
+        return SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Time',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Done', style: TextStyle(fontSize: 16)),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Picker
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  initialDateTime: initialDateTime,
+                  use24hFormat: false,
+                  onDateTimeChanged: (DateTime newDate) {
+                    // Update the temp date, but KEEP the originally selected Day/Month/Year
+                    // (The time picker often defaults to 'today' or '2001' depending on implementation,
+                    // but we just want the time components)
+                    tempPickedDateTime = DateTime(
+                      _selectedDate.year,
+                      _selectedDate.month,
+                      _selectedDate.day,
+                      newDate.hour,
+                      newDate.minute,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    // VALIDATION LOGIC after selection is confirmed (sheet closed)
+    final now = DateTime.now();
+    if (tempPickedDateTime.isBefore(now)) {
+      _showSnackBar(
+        'Please select a future time. Selection Reset.',
+        Colors.red,
+      );
+      // We do not update _selectedTime, essentially filtering the invalid input
+    } else {
+      setState(() {
+        _selectedTime = TimeOfDay.fromDateTime(tempPickedDateTime);
+      });
     }
   }
 
