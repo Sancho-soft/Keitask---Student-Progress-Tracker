@@ -32,11 +32,14 @@ service cloud.firestore {
         ))
         ||
         // Assignee can resubmit when rejected, and complete when pending/resubmitted
+        // Assignee can resubmit when rejected, and complete when pending/resubmitted
         ((resource.data.assignee == request.auth.uid) && (
+          // Status transitions
           (resource.data.status == 'rejected' && request.resource.data.status == 'resubmitted') ||
           (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'completed') ||
-          // allow edits that don't change status
-          (resource.data.status == request.resource.data.status)
+          // Allow edits to submissions/notes WITHOUT changing status (e.g. adding files)
+          (resource.data.status == request.resource.data.status && 
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissions', 'notes']))
         ))
       );
 
