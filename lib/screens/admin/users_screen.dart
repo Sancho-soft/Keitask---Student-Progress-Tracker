@@ -218,86 +218,177 @@ class _UsersScreenState extends State<UsersScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                if (!isProfessor) // Admin Filters
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterChip(
-                          'All',
-                          _roleFilter == 'all' && !_showBanned,
-                          () {
-                            setState(() {
-                              _roleFilter = 'all';
-                              _showBanned = false;
-                            });
-                          },
+                if (isAdmin)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.build_circle, size: 16),
+                        label: const Text(
+                          'Migrate Legacy Users (Fix Leaderboard)',
                         ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          'Students',
-                          _roleFilter == 'student' && !_showBanned,
-                          () {
-                            setState(() {
-                              _roleFilter = 'student';
-                              _showBanned = false;
-                            });
-                          },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
                         ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          'Professors',
-                          _roleFilter == 'professor' && !_showBanned,
-                          () {
-                            setState(() {
-                              _roleFilter = 'professor';
-                              _showBanned = false;
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          'Pending',
-                          _roleFilter == 'pending' && !_showBanned,
-                          () {
-                            setState(() {
-                              _roleFilter = 'pending'; // New filter logic
-                              _showBanned = false;
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: const Text('Banned Users'),
-                          selected: _showBanned,
-                          onSelected: (val) {
-                            setState(() {
-                              _showBanned = val;
-                              if (val) {
-                                _roleFilter =
-                                    'all'; // Reset role filter when showing banned
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Migrate Legacy Users'),
+                              content: const Text(
+                                'This will update all users with the legacy role "user" to the new "student" role.\n\n'
+                                'This fixes the leaderboard visibility for older accounts.\n\n'
+                                'Admins and Professors will remain unchanged.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Migrate'),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm == true) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Starting migration...'),
+                              ),
+                            );
+
+                            try {
+                              final firestore = FirebaseFirestore.instance;
+                              final batch = firestore.batch();
+
+                              // Find all 'user' role docs
+                              final query = await firestore
+                                  .collection('users')
+                                  .where('role', isEqualTo: 'user')
+                                  .get();
+
+                              // Filter out known admins/professors if they accidentally have 'user' role?
+                              // Actually, the goal IS to fix them. If an admin is set to 'user', they lose powers.
+                              // So we assume 'user' meant 'student'.
+
+                              int count = 0;
+                              for (var doc in query.docs) {
+                                batch.update(doc.reference, {
+                                  'role': 'student',
+                                });
+                                count++;
                               }
-                            });
-                          },
-                          backgroundColor: isDark
-                              ? Colors.grey[800]
-                              : Colors.grey[200],
-                          selectedColor: isDark
-                              ? Colors.red.withAlpha(50)
-                              : Colors.red[100],
-                          labelStyle: TextStyle(
-                            color: _showBanned
-                                ? Colors.red
-                                : (isDark ? Colors.grey[300] : Colors.black87),
-                            fontWeight: _showBanned
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                          checkmarkColor: Colors.red,
-                        ),
-                      ],
+
+                              await batch.commit();
+
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Migration successful: Updated $count users.',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Migration failed: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                      ),
                     ),
                   ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip(
+                        'All',
+                        _roleFilter == 'all' && !_showBanned,
+                        () {
+                          setState(() {
+                            _roleFilter = 'all';
+                            _showBanned = false;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Students',
+                        _roleFilter == 'student' && !_showBanned,
+                        () {
+                          setState(() {
+                            _roleFilter = 'student';
+                            _showBanned = false;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Professors',
+                        _roleFilter == 'professor' && !_showBanned,
+                        () {
+                          setState(() {
+                            _roleFilter = 'professor';
+                            _showBanned = false;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildFilterChip(
+                        'Pending',
+                        _roleFilter == 'pending' && !_showBanned,
+                        () {
+                          setState(() {
+                            _roleFilter = 'pending'; // New filter logic
+                            _showBanned = false;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text('Banned Users'),
+                        selected: _showBanned,
+                        onSelected: (val) {
+                          setState(() {
+                            _showBanned = val;
+                            if (val) {
+                              _roleFilter =
+                                  'all'; // Reset role filter when showing banned
+                            }
+                          });
+                        },
+                        backgroundColor: isDark
+                            ? Colors.grey[800]
+                            : Colors.grey[200],
+                        selectedColor: isDark
+                            ? Colors.red.withAlpha(50)
+                            : Colors.red[100],
+                        labelStyle: TextStyle(
+                          color: _showBanned
+                              ? Colors.red
+                              : (isDark ? Colors.grey[300] : Colors.black87),
+                          fontWeight: _showBanned
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                        checkmarkColor: Colors.red,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

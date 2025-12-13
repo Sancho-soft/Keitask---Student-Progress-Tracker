@@ -97,8 +97,10 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
         final file = _pickedFiles[i];
         if (file.path == null) continue;
 
+        final folderPath = 'submissions/${widget.task.id}/${widget.user.id}';
         final url = await storageService.uploadFile(
           File(file.path!),
+          folder: folderPath,
           onProgress: (progress) {
             // Update overall progress (simplified)
             setState(() {
