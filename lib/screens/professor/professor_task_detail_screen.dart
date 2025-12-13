@@ -302,9 +302,10 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                 const SizedBox(height: 16),
                 if (isGraded) const Divider(),
                 if (isGraded)
-                  Text(
-                    'Grade: ${scoreController.text} / 100\nFeedback: ${feedbackController.text}',
-                  ),
+                  if (isGraded)
+                    Text(
+                      'Grade: ${scoreController.text} / 100\nFeedback: ${feedbackController.text}',
+                    ),
                 if (!isGraded) ...[
                   const Divider(),
                   TextField(
@@ -330,10 +331,7 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                 onPressed: () {
                   // Reject Logic
                   Navigator.pop(dialogContext);
-                  _showRejectDialog(
-                    context,
-                    task.id,
-                  ); // Implement simple reject
+                  _showRejectDialog(context, task.id);
                 },
                 child: const Text(
                   'Reject (Resubmit)',
@@ -348,6 +346,14 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
               ElevatedButton(
                 onPressed: () async {
                   final score = double.tryParse(scoreController.text) ?? 0.0;
+
+                  if (score > 100) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Score cannot exceed 100')),
+                    );
+                    return;
+                  }
+
                   final feedback = feedbackController.text;
 
                   final grade = Grade(
