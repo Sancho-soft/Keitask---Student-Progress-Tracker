@@ -78,9 +78,10 @@ class StorageService {
 
         // Explicitly request public access.
         // This attempts to override any "Private" default in the folder/preset.
-        try {
-          request.fields['access_mode'] = 'public';
-        } catch (_) {}
+        // REVERTED: This caused upload failures (400 Bad Request) on the user's preset.
+        // try {
+        //   request.fields['access_mode'] = 'public';
+        // } catch (_) {}
 
         request.files.add(multipartFile);
 
