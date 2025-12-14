@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/storage_service.dart';
-import '../../utils/attachment_helper.dart';
 
 class TaskSubmissionScreen extends StatefulWidget {
   final Task task;
@@ -26,11 +25,6 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
   final TextEditingController _notesController = TextEditingController();
   bool _isUploading = false;
   double _uploadProgress = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   void dispose() {
@@ -227,77 +221,9 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
             widget.task.description,
             style: const TextStyle(color: Colors.grey),
           ),
-
           const SizedBox(height: 24),
-
-          // --- Professor's Attachments ---
-          if (widget.task.attachments != null &&
-              widget.task.attachments!.isNotEmpty) ...[
-            const Text(
-              'Task Attachments',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 100,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: widget.task.attachments!.length,
-                itemBuilder: (context, index) {
-                  final url = widget.task.attachments![index];
-                  final uri = Uri.parse(url);
-                  final fileName =
-                      uri.queryParameters['originalName'] ??
-                      url.split('/').last.split('?').first;
-                  final isPdf = url.toLowerCase().contains('.pdf');
-                  final isImage =
-                      url.toLowerCase().contains('.jpg') ||
-                      url.toLowerCase().contains('.jpeg') ||
-                      url.toLowerCase().contains('.png');
-
-                  return GestureDetector(
-                    onTap: () => AttachmentHelper.openAttachment(context, url),
-                    child: Container(
-                      width: 100,
-                      margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isPdf
-                                ? Icons.picture_as_pdf
-                                : (isImage ? Icons.image : Icons.description),
-                            color: isPdf
-                                ? Colors.red
-                                : (isImage ? Colors.purple : Colors.blue),
-                            size: 32,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            fileName,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-
           const Text(
-            'Your Submission',
+            'Attachments',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/user_model.dart'; // Task, User, Grade classes
 import '../../models/grade_model.dart';
 import '../../services/firestore_task_service.dart';
-import '../../utils/attachment_helper.dart';
 
 class SubmissionDetailsDialog extends StatefulWidget {
   final Task task;
@@ -29,6 +29,20 @@ class SubmissionDetailsDialog extends StatefulWidget {
 class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
   final _scoreController = TextEditingController();
   final _commentController = TextEditingController();
+
+  // Helper for PDF fetching (printing package)
+  Future<Uint8List> _fetchPdf(String url) async {
+    final uri = Uri.parse(url);
+    final response = await NetworkAssetBundle(uri).load("");
+    return response.buffer.asUint8List();
+  }
+
+  String _getDownloadUrl(String url) {
+    if (url.contains('cloudinary.com') && url.contains('/upload/')) {
+      return url.replaceFirst('/upload/', '/upload/fl_attachment/');
+    }
+    return url;
+  }
 
   bool _isImage(String url) {
     final lower = url.toLowerCase().split('?').first;
@@ -131,10 +145,7 @@ class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
               ...widget.submissionUrls.map((url) {
                 final isImage = _isImage(url);
                 final isPdf = url.toLowerCase().contains('.pdf');
-                final uri = Uri.parse(url);
-                final fileName =
-                    uri.queryParameters['originalName'] ??
-                    url.split('/').last.split('?').first;
+                final fileName = url.split('/').last.split('?').first;
                 final shortName = fileName.length > 30
                     ? '${fileName.substring(0, 30)}...'
                     : fileName;
@@ -148,7 +159,32 @@ class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
                   ),
                   child: InkWell(
                     onTap: () {
-                      AttachmentHelper.openAttachment(context, url);
+                      if (isImage) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenImage(url: url),
+                          ),
+                        );
+                      } else if (isPdf) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => Scaffold(
+                              appBar: AppBar(title: Text(shortName)),
+                              body: PdfPreview(
+                                build: (format) => _fetchPdf(url),
+                                useActions: false,
+                              ),
+                            ),
+                          ),
+                        );
+                      } else {
+                        launchUrl(
+                          Uri.parse(_getDownloadUrl(url)),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
                     },
                     child: Column(
                       children: [
@@ -177,7 +213,10 @@ class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
                               icon: const Icon(Icons.open_in_new, size: 20),
                               tooltip: 'Open',
                               onPressed: () {
-                                AttachmentHelper.openAttachment(context, url);
+                                launchUrl(
+                                  Uri.parse(_getDownloadUrl(url)),
+                                  mode: LaunchMode.externalApplication,
+                                );
                               },
                             ),
                           ],
@@ -304,5 +343,32 @@ class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
         context,
       ).showSnackBar(SnackBar(content: Text('Error saving grade: $e')));
     }
+  }
+}
+
+class FullScreenImage extends StatelessWidget {
+  final String url;
+  const FullScreenImage({super.key, required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: InteractiveViewer(
+        child: Center(
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Center(
+              child: Text('Image Error', style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

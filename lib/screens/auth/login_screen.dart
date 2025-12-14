@@ -19,24 +19,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   Future<void> _login() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (email.isEmpty || password.isEmpty) {
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
       FlashMessage.show(
         context,
         message: 'Please enter email and password',
-        type: FlashMessageType.warning,
-      );
-      return;
-    }
-
-    // Basic email format validation
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(email)) {
-      FlashMessage.show(
-        context,
-        message: 'Please enter a valid email address (e.g. name@example.com)',
         type: FlashMessageType.warning,
       );
       return;

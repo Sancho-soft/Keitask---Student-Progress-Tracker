@@ -635,23 +635,6 @@ class AuthService extends ChangeNotifier {
     return snap.docs.map((d) => app_models.User.fromJson(d.data())).toList();
   }
 
-  Future<void> reauthenticate(String password) async {
-    try {
-      if (firebaseUser == null || firebaseUser!.email == null) {
-        throw 'No user signed in';
-      }
-
-      final credential = fb_auth.EmailAuthProvider.credential(
-        email: firebaseUser!.email!,
-        password: password,
-      );
-
-      await firebaseUser!.reauthenticateWithCredential(credential);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
   Future<void> deleteAccount() async {
     try {
       if (firebaseUser == null) throw 'No user signed in';

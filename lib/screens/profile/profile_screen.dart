@@ -321,6 +321,15 @@ class ProfileScreen extends StatelessWidget {
                         onTap: () => _showLogoutDialog(context),
                         isDestructive: true,
                       ),
+                      const SizedBox(height: 12),
+                      _buildSettingItem(
+                        context,
+                        icon: Icons.delete_forever,
+                        label: 'Delete Account',
+                        color: Colors.red,
+                        onTap: () => _showDeleteAccountDialog(context),
+                        isDestructive: true,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 40),
@@ -783,24 +792,6 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  Divider(color: Colors.grey.withAlpha(50)),
-                  Container(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: () => _showDeleteAccountDialog(context),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.red.withAlpha(50)),
-                        ),
-                      ),
-                      icon: const Icon(Icons.delete_forever, size: 20),
-                      label: const Text('Delete Account'),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -1170,8 +1161,9 @@ class ProfileScreen extends StatelessWidget {
 
   void _showDeleteAccountDialog(BuildContext context) {
     bool isLoading = false;
-    final passwordController = TextEditingController();
-    bool obscurePassword = true;
+    // For simple delete (if recently signed in), we might not need password re-entry flow
+    // unless we want to be strict. For this 'quick fix', we will try delete directly.
+    // If it fails with 'requires-recent-login', we show an error.
 
     showDialog(
       context: context,
@@ -1180,54 +1172,17 @@ class ProfileScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          title: const Text(
-            'Delete Account',
-            style: TextStyle(color: Colors.red),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  size: 48,
-                  color: Colors.red,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Are you sure? This action CANNOT be undone.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'All your data (tasks, submissions, profile) will be permanently removed.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: passwordController,
-                  obscureText: obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Confirm Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                      ),
-                      onPressed: () =>
-                          setState(() => obscurePassword = !obscurePassword),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          title: const Text('Delete Account'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Are you sure? This action CANNOT be undone.'),
+              const SizedBox(height: 10),
+              const Text(
+                'All your data (tasks, submissions, profile) will be permanently removed.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -1239,33 +1194,16 @@ class ProfileScreen extends StatelessWidget {
             else
               TextButton(
                 onPressed: () async {
-                  if (passwordController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter your password to confirm.'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-
                   setState(() => isLoading = true);
                   try {
-                    // 1. Verify Password
-                    await Provider.of<AuthService>(
-                      context,
-                      listen: false,
-                    ).reauthenticate(passwordController.text.trim());
-
-                    // 2. Perform Delete
                     await Provider.of<AuthService>(
                       context,
                       listen: false,
                     ).deleteAccount();
 
                     if (context.mounted) {
-                      Navigator.pop(context); // Close Dialog
-                      // Navigate to splash/login and remove all routes
+                      Navigator.pop(context);
+                      // Navigate to splash/login
                       Navigator.of(
                         context,
                       ).pushNamedAndRemoveUntil('/', (route) => false);
@@ -1273,7 +1211,7 @@ class ProfileScreen extends StatelessWidget {
                   } catch (e) {
                     if (context.mounted) {
                       setState(() => isLoading = false);
-                      // Do not close dialog, let them fix password
+                      Navigator.pop(context); // Close dialog
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Error: $e'),
