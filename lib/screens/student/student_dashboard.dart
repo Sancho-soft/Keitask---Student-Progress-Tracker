@@ -5,6 +5,9 @@ import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
 import '../profile/progress_detail_screen.dart';
+import '../../utils/attachment_helper.dart';
+import 'task_submission_screen.dart';
+import 'submission_details_dialog.dart';
 
 class StudentDashboard extends StatefulWidget {
   final User user;
@@ -234,73 +237,79 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Builder(
-                                builder: (ctx) {
-                                  final displayUser =
-                                      auth.appUser ?? widget.user;
-                                  return CircleAvatar(
-                                    radius: 26,
-                                    backgroundColor: Colors.white,
-                                    backgroundImage:
-                                        (displayUser.profileImage != null &&
-                                            displayUser
-                                                .profileImage!
-                                                .isNotEmpty)
-                                        ? NetworkImage(
-                                            displayUser.profileImage!,
-                                          )
-                                        : null,
-                                    child:
-                                        (displayUser.profileImage == null ||
-                                            displayUser.profileImage!.isEmpty)
-                                        ? Text(
-                                            displayUser.name.isNotEmpty
-                                                ? displayUser.name[0]
-                                                      .toUpperCase()
-                                                : '?',
-                                            style: TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.blue[800],
-                                            ),
-                                          )
-                                        : null,
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hi, ${(auth.appUser?.name ?? widget.user.name)}!',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Track your progress',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withAlpha(200),
-                                  ),
+                                child: Builder(
+                                  builder: (ctx) {
+                                    final displayUser =
+                                        auth.appUser ?? widget.user;
+                                    return CircleAvatar(
+                                      radius: 26,
+                                      backgroundColor: Colors.white,
+                                      backgroundImage:
+                                          (displayUser.profileImage != null &&
+                                              displayUser
+                                                  .profileImage!
+                                                  .isNotEmpty)
+                                          ? NetworkImage(
+                                              displayUser.profileImage!,
+                                            )
+                                          : null,
+                                      child:
+                                          (displayUser.profileImage == null ||
+                                              displayUser.profileImage!.isEmpty)
+                                          ? Text(
+                                              displayUser.name.isNotEmpty
+                                                  ? displayUser.name[0]
+                                                        .toUpperCase()
+                                                  : '?',
+                                              style: TextStyle(
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.blue[800],
+                                              ),
+                                            )
+                                          : null,
+                                    );
+                                  },
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Hi, ${(auth.appUser?.name ?? widget.user.name)}!',
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Track your progress',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white.withAlpha(200),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         // Notification Icon
                         StreamBuilder<QuerySnapshot>(
@@ -856,15 +865,243 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
+  void _showTaskActionsSheet(
+    BuildContext screenContext,
+    Task task,
+    FirestoreTaskService taskService,
+    User? effectiveUser,
+  ) {
+    showModalBottomSheet(
+      context: screenContext,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true, // Allow full height for content
+      builder: (sheetContext) {
+        final statusLower = task.status.toLowerCase();
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              if (task.description.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Text(
+                    task.description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+
+              // --- Attachments Section ---
+              if (task.attachments != null && task.attachments!.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Attachments',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: task.attachments!.length,
+                    itemBuilder: (context, index) {
+                      final url = task.attachments![index];
+                      final uri = Uri.parse(url);
+                      final fileName =
+                          uri.queryParameters['originalName'] ??
+                          url.split('/').last.split('?').first;
+                      final isPdf = url.toLowerCase().contains('.pdf');
+                      final isImage =
+                          url.toLowerCase().contains('.jpg') ||
+                          url.toLowerCase().contains('.jpeg') ||
+                          url.toLowerCase().contains('.png');
+
+                      return GestureDetector(
+                        onTap: () =>
+                            AttachmentHelper.openAttachment(context, url),
+                        child: Container(
+                          width: 80,
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                isPdf
+                                    ? Icons.picture_as_pdf
+                                    : (isImage
+                                          ? Icons.image
+                                          : Icons.description),
+                                color: isPdf
+                                    ? Colors.red
+                                    : (isImage ? Colors.purple : Colors.blue),
+                                size: 32,
+                              ),
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                child: Text(
+                                  fileName,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              const Divider(height: 1),
+
+              if (statusLower == 'rejected')
+                ListTile(
+                  leading: const Icon(Icons.report_problem, color: Colors.red),
+                  title: const Text(
+                    'View Rejection Reason',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    showDialog(
+                      context: screenContext,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Rejection Reason'),
+                        content: Text(
+                          task.rejectionReason ?? 'No reason provided.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+              // Action: Submit/Resubmit
+              if (effectiveUser?.role != 'admin' &&
+                  effectiveUser?.role != 'professor')
+                ListTile(
+                  leading: const Icon(Icons.upload_file, color: Colors.blue),
+                  title: Text(
+                    statusLower == 'rejected' ? 'Resubmit Task' : 'Submit Task',
+                    style: TextStyle(
+                      color: statusLower == 'rejected'
+                          ? Colors.red
+                          : Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(
+                      screenContext,
+                      MaterialPageRoute(
+                        builder: (context) => TaskSubmissionScreen(
+                          task: task,
+                          user: effectiveUser!,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+              // Action: View Submission (if pending or completed)
+              if (statusLower == 'pending' ||
+                  statusLower == 'approved' ||
+                  statusLower == 'completed' ||
+                  (task.submissions?.containsKey(effectiveUser?.id) ?? false))
+                ListTile(
+                  leading: const Icon(Icons.visibility, color: Colors.grey),
+                  title: const Text('View My Submission'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    if (effectiveUser != null &&
+                        task.submissions != null &&
+                        task.submissions!.containsKey(effectiveUser.id)) {
+                      showDialog(
+                        context: screenContext,
+                        builder: (_) => SubmissionDetailsDialog(
+                          task: task,
+                          studentId: effectiveUser.id,
+                          submissionUrls: task.submissions![effectiveUser.id]!,
+                          viewer: effectiveUser,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(screenContext).showSnackBar(
+                        const SnackBar(content: Text('No submission found')),
+                      );
+                    }
+                  },
+                ),
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildRecentTaskCard(Task task) {
     final statusColor = _getStatusColor(task.status);
+    final firestore = Provider.of<FirestoreTaskService>(context, listen: false);
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final effectiveUser = auth.appUser ?? widget.user;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {
-          // Navigate to task details
-        },
+        onTap: () =>
+            _showTaskActionsSheet(context, task, firestore, effectiveUser),
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
@@ -882,48 +1119,76 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ],
           ),
           padding: const EdgeInsets.all(16),
-          child: Row(
+          child: Column(
             children: [
-              Container(
-                width: 4,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      task.title,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          size: 12,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
                         Text(
-                          _formatDate(task.dueDate),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
+                          task.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              size: 12,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDate(task.dueDate),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 36,
+                child: OutlinedButton(
+                  onPressed: () => _showTaskActionsSheet(
+                    context,
+                    task,
+                    firestore,
+                    effectiveUser,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    side: BorderSide(color: Colors.blue.withAlpha(50)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'View Task & Instructions',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
               ),
             ],

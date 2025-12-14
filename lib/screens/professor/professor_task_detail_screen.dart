@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/user_model.dart';
 import '../../models/grade_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/attachment_helper.dart';
 
 class ProfessorTaskDetailScreen extends StatefulWidget {
   final Task task;
@@ -240,89 +240,144 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
       builder: (dialogContext) {
         return AlertDialog(
           title: Text(isGraded ? 'Submission Details' : 'Grade Submission'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Attachments:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                if (fileUrls.isEmpty)
-                  const Text('No files attached.')
-                else
-                  ...fileUrls.map(
-                    (url) => InkWell(
-                      onTap: () => launchUrl(Uri.parse(url)),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.attachment,
-                              size: 16,
-                              color: Colors.blue,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                url.split('/').last,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.blue,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ),
-                          ],
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Attachments:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (fileUrls.isEmpty)
+                    const Text('No files attached.')
+                  else
+                    ...fileUrls.map((url) {
+                      final lower = url.toLowerCase().split('?').first;
+                      final isImage =
+                          lower.endsWith('.jpg') ||
+                          lower.endsWith('.jpeg') ||
+                          lower.endsWith('.png') ||
+                          lower.endsWith('.webp') ||
+                          lower.endsWith('.gif');
+                      final isPdf = lower.endsWith('.pdf');
+                      final fileName = url.split('/').last.split('?').first;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ),
+                        child: InkWell(
+                          onTap: () =>
+                              AttachmentHelper.openAttachment(context, url),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      isImage
+                                          ? Icons.image
+                                          : (isPdf
+                                                ? Icons.picture_as_pdf
+                                                : Icons.insert_drive_file),
+                                      size: 20,
+                                      color: isImage
+                                          ? Colors.purple
+                                          : (isPdf ? Colors.red : Colors.blue),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        fileName,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.blue,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.open_in_new,
+                                      size: 16,
+                                      color: Colors.grey,
+                                    ),
+                                  ],
+                                ),
+                                if (isImage) ...[
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Image.network(
+                                      url,
+                                      height: 150,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (ctx, error, stack) =>
+                                          Container(
+                                            height: 150,
+                                            color: Colors.grey[200],
+                                            alignment: Alignment.center,
+                                            child: const Text('Image Error'),
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Reflections/Notes:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      task.submissionNotes?[studentId] ?? 'No notes provided.',
+                      style: const TextStyle(fontSize: 13),
                     ),
                   ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Reflections/Notes:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    task.submissionNotes?[studentId] ?? 'No notes provided.',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                if (isGraded) const Divider(),
-                if (isGraded)
+                  const SizedBox(height: 16),
+                  if (isGraded) const Divider(),
                   if (isGraded)
                     Text(
                       'Grade: ${scoreController.text} / 100\nFeedback: ${feedbackController.text}',
                     ),
-                if (!isGraded) ...[
-                  const Divider(),
-                  TextField(
-                    controller: scoreController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Score (0-100)',
+                  if (!isGraded) ...[
+                    const Divider(),
+                    TextField(
+                      controller: scoreController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Score (0-100)',
+                      ),
                     ),
-                  ),
-                  TextField(
-                    controller: feedbackController,
-                    decoration: const InputDecoration(
-                      labelText: 'Feedback (Optional)',
+                    TextField(
+                      controller: feedbackController,
+                      decoration: const InputDecoration(
+                        labelText: 'Feedback (Optional)',
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           actions: [

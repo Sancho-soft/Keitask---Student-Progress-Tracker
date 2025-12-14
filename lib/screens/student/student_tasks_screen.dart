@@ -5,8 +5,9 @@ import 'submission_details_dialog.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
-import '../../services/task_service.dart';
+
 import 'task_submission_screen.dart';
+import '../../utils/attachment_helper.dart';
 
 class StudentTasksScreen extends StatefulWidget {
   final User? user;
@@ -422,7 +423,10 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                       _showTaskActionsSheet(
                         context,
                         found,
-                        Provider.of<TaskService>(context, listen: false),
+                        Provider.of<FirestoreTaskService>(
+                          context,
+                          listen: false,
+                        ),
                         effectiveUser,
                       );
                     });
@@ -453,7 +457,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                     return _buildTaskCard(
                       context,
                       task,
-                      Provider.of<TaskService>(context),
+                      Provider.of<FirestoreTaskService>(context),
                       effectiveUser,
                     );
                   },
@@ -469,7 +473,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
   void _showTaskActionsSheet(
     BuildContext screenContext,
     Task task,
-    TaskService taskService,
+    FirestoreTaskService taskService,
     User? effectiveUser,
   ) {
     showModalBottomSheet(
@@ -494,6 +498,132 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                   ),
                 ),
               ),
+              if (task.description.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Text(
+                    task.description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[700],
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+
+              // --- Attachments Section ---
+              if (task.attachments != null && task.attachments!.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Attachments',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: task.attachments!.length,
+                    itemBuilder: (context, index) {
+                      final url = task.attachments![index];
+                      // Simple filename extraction
+                      final uri = Uri.parse(url);
+                      final fileName =
+                          uri.queryParameters['originalName'] ??
+                          url.split('/').last.split('?').first;
+                      final isPdf = url.toLowerCase().contains('.pdf');
+                      final isImage =
+                          url.toLowerCase().contains('.jpg') ||
+                          url.toLowerCase().contains('.jpeg') ||
+                          url.toLowerCase().contains('.png');
+
+                      return GestureDetector(
+                        onTap: () =>
+                            AttachmentHelper.openAttachment(context, url),
+                        child: Container(
+                          width: 80,
+                          margin: const EdgeInsets.only(right: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      isPdf
+                                          ? Icons.picture_as_pdf
+                                          : (isImage
+                                                ? Icons.image
+                                                : Icons.description),
+                                      color: isPdf
+                                          ? Colors.red
+                                          : (isImage
+                                                ? Colors.purple
+                                                : Colors.blue),
+                                      size: 32,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      child: Text(
+                                        fileName,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 10),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    // Stop propagation? GestureDetector handles it.
+                                    AttachmentHelper.downloadAttachment(
+                                      context,
+                                      url,
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.8),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.download,
+                                      size: 14,
+                                      color: Colors.black54,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               const Divider(height: 1),
               if (statusLower == 'rejected')
                 ListTile(
@@ -728,7 +858,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
   Widget _buildTaskCard(
     BuildContext context,
     Task task,
-    TaskService taskService,
+    FirestoreTaskService taskService,
     User? effectiveUser,
   ) {
     final bool isCompleted = task.status.toLowerCase() == 'completed';
@@ -761,6 +891,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
       return 'Ongoing';
     }
 
+    final isRejected = task.status == 'rejected';
     final statusText = getTaskStatus();
     final statusColor = isCompleted
         ? Colors.green
@@ -768,69 +899,70 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
               ? Colors.green
               : (isOverdue
                     ? Colors.red
-                    : (task.status == 'rejected'
-                          ? Colors.orange
-                          : Colors.blue)));
+                    : (isRejected ? Colors.red : Colors.blue)));
 
     final isBookmarked =
         effectiveUser != null &&
         (task.bookmarkedBy?.contains(effectiveUser.id) ?? false);
 
-    return GestureDetector(
-      onTap: () =>
-          _showTaskActionsSheet(this.context, task, taskService, effectiveUser),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(
-                Theme.of(context).brightness == Brightness.dark ? 50 : 10,
-              ),
-              spreadRadius: 0,
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(
+              Theme.of(context).brightness == Brightness.dark ? 50 : 10,
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: iconColor.withAlpha(30),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(statusIcon, color: iconColor, size: 20),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: isRejected
+            ? Border.all(color: Colors.red.withAlpha(100))
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: iconColor.withAlpha(30),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              task.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                                decoration: isCompleted
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
+                child: Icon(statusIcon, color: iconColor, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                              decoration: isCompleted
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             ),
                           ),
-                          IconButton(
+                        ),
+                        Material(
+                          color: Colors.transparent,
+                          child: IconButton(
                             icon: Icon(
                               isBookmarked
                                   ? Icons.bookmark
@@ -838,57 +970,96 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                               color: isBookmarked ? Colors.blue : Colors.grey,
                               size: 24,
                             ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                            visualDensity: VisualDensity.compact,
+                            splashRadius: 24, // Explicit splash radius
                             onPressed: () async {
-                              if (effectiveUser == null) return;
-                              await taskService.toggleBookmark(
-                                task.id,
-                                effectiveUser.id,
-                                !isBookmarked,
+                              debugPrint(
+                                'Bookmark tapped. User: ${effectiveUser?.id}',
                               );
+                              if (effectiveUser == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Error: User not identified'),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              try {
+                                await taskService.toggleBookmark(
+                                  task.id,
+                                  effectiveUser.id,
+                                  !isBookmarked,
+                                );
+                              } catch (e) {
+                                debugPrint('Bookmark error: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to bookmark: $e'),
+                                    behavior: SnackBarBehavior.floating,
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
                             },
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusColor.withAlpha(30),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              statusText,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: statusColor,
-                              ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withAlpha(30),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: statusColor.withAlpha(50),
                             ),
                           ),
-                        ],
-                      ),
-                      // Creator Name
-                      if ((task.creator?.isNotEmpty ?? false) &&
-                          _userCache.containsKey(task.creator))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4, bottom: 4),
                           child: Text(
-                            'Assigned by: ${_userCache[task.creator]?.name ?? "Unknown"}',
+                            statusText,
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[600],
-                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
                             ),
                           ),
                         ),
-                      const SizedBox(height: 8),
+                      ],
+                    ),
+                    if (isRejected)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          'Waiting for resubmission',
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
 
-                      // Status Badge & Deadline
-                      Row(
+                    // Creator Name
+                    if ((task.creator?.isNotEmpty ?? false) &&
+                        _userCache.containsKey(task.creator))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, bottom: 4),
+                        child: Text(
+                          'Assigned by: ${_userCache[task.creator]?.name ?? "Unknown"}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    // Deadline
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
                         children: [
                           Icon(
                             Icons.access_time,
@@ -908,177 +1079,182 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            // Grade Display
-            if (effectiveUser != null &&
-                task.grades != null &&
-                task.grades!.containsKey(effectiveUser.id)) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withAlpha(30),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 16),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Grade: ${task.grades![effectiveUser.id]!.score.toStringAsFixed(1)} / 100',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.amber[900],
-                          ),
-                        ),
-                      ],
                     ),
-                    if (task.grades![effectiveUser.id]!.comment != null &&
-                        task
-                            .grades![effectiveUser.id]!
-                            .comment!
-                            .isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Comment: ${task.grades![effectiveUser.id]!.comment}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.amber[900],
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
             ],
+          ),
 
-            if (task.assignees.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // Grade Display
+          if (effectiveUser != null &&
+              task.grades != null &&
+              task.grades!.containsKey(effectiveUser.id)) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withAlpha(30),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    height: 32,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      shrinkWrap: true,
-                      itemCount: task.assignees.length > 4
-                          ? 5
-                          : task.assignees.length,
-                      itemBuilder: (context, index) {
-                        if (index == 4) {
-                          return CircleAvatar(
-                            radius: 14,
-                            backgroundColor: Colors.grey[200],
-                            child: Text(
-                              '+${task.assignees.length - 4}',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          );
-                        }
-                        final assigneeId = task.assignees[index];
-                        final isUserCompleted =
-                            task.completionStatus != null &&
-                            task.completionStatus!.containsKey(assigneeId);
-                        final assigneeUser = _userCache[assigneeId];
-
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: Colors.blue[50],
-                                backgroundImage:
-                                    (assigneeUser?.profileImage?.isNotEmpty ??
-                                        false)
-                                    ? NetworkImage(assigneeUser!.profileImage!)
-                                    : null,
-                                child:
-                                    (assigneeUser?.profileImage == null ||
-                                        assigneeUser!.profileImage!.isEmpty)
-                                    ? Text(
-                                        _getUserInitials(assigneeId),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.blue[800],
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              if (isUserCompleted)
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle,
-                                      border: Border.fromBorderSide(
-                                        BorderSide(
-                                          color: Colors.white,
-                                          width: 1.5,
-                                        ),
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.check,
-                                      size: 8,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Grade: ${task.grades![effectiveUser.id]!.score.toStringAsFixed(1)} / 100',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber[900],
+                        ),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: Icon(
-                      isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: isBookmarked ? Colors.blue : Colors.grey[400],
-                      size: 20,
+                  if (task.grades![effectiveUser.id]!.comment != null &&
+                      task.grades![effectiveUser.id]!.comment!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Comment: ${task.grades![effectiveUser.id]!.comment}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.amber[900],
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                    onPressed: effectiveUser == null
-                        ? null
-                        : () async {
-                            final firestore = Provider.of<FirestoreTaskService>(
-                              context,
-                              listen: false,
-                            );
-                            try {
-                              await firestore.toggleBookmark(
-                                task.id,
-                                effectiveUser.id,
-                                !isBookmarked,
-                              );
-                            } catch (_) {}
-                          },
-                  ),
+                  ],
                 ],
               ),
-            ],
+            ),
           ],
-        ),
+
+          if (task.assignees.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SizedBox(
+                  height: 32,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    shrinkWrap: true,
+                    itemCount: task.assignees.length > 4
+                        ? 5
+                        : task.assignees.length,
+                    itemBuilder: (context, index) {
+                      if (index == 4) {
+                        return CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.grey[200],
+                          child: Text(
+                            '+${task.assignees.length - 4}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      }
+                      final assigneeId = task.assignees[index];
+                      final isUserCompleted =
+                          task.completionStatus != null &&
+                          task.completionStatus!.containsKey(assigneeId);
+                      final assigneeUser = _userCache[assigneeId];
+
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: Colors.blue[50],
+                              backgroundImage:
+                                  (assigneeUser?.profileImage?.isNotEmpty ??
+                                      false)
+                                  ? NetworkImage(assigneeUser!.profileImage!)
+                                  : null,
+                              child:
+                                  (assigneeUser?.profileImage == null ||
+                                      assigneeUser!.profileImage!.isEmpty)
+                                  ? Text(
+                                      _getUserInitials(assigneeId),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.blue[800],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            if (isUserCompleted)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                    border: Border.fromBorderSide(
+                                      BorderSide(
+                                        color: Colors.white,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    size: 8,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 12),
+
+          // View Task & Action Buttons
+          const SizedBox(height: 12),
+          // View Task & Action Buttons
+          Row(
+            children: [
+              // 1. View Task Button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showTaskActionsSheet(
+                    this.context,
+                    task,
+                    taskService,
+                    effectiveUser,
+                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 16),
+                  label: const Text('View Task'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 0,
+                      horizontal: 8,
+                    ),
+                    side: BorderSide(color: Colors.grey.shade400),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

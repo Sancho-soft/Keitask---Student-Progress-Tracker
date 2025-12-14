@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart' as app_models;
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
+import 'package:file_picker/file_picker.dart';
+import '../../services/storage_service.dart';
+import 'dart:io';
 
 class CreateTaskScreen extends StatefulWidget {
   final bool adminCreate;
@@ -37,6 +40,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   bool _allowMultipleAssign = false;
   bool _assignToAll = false;
   bool _isCreating = false;
+
+  // Attachments
+  final List<PlatformFile> _pickedFiles = [];
 
   late Stream<List<app_models.User>> _usersStream;
 
@@ -183,6 +189,41 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     }
   }
 
+  // --- File Picker Logic ---
+  Future<void> _pickFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: [
+          'pdf',
+          'jpg',
+          'doc',
+          'docx',
+          'ppt',
+          'pptx',
+          'xls',
+          'xlsx',
+          'txt',
+        ],
+      );
+
+      if (result != null) {
+        setState(() {
+          _pickedFiles.addAll(result.files);
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Error picking files: $e', Colors.red);
+    }
+  }
+
+  void _removeFile(int index) {
+    setState(() {
+      _pickedFiles.removeAt(index);
+    });
+  }
+
   Future<void> _createTask() async {
     final taskService = Provider.of<FirestoreTaskService>(
       context,
@@ -228,6 +269,40 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     // args, user, and adminCreate already determined above
     final creatorId = user?.id ?? 'unknown_creator';
 
+    // 1. Upload Attachments Logic
+    List<String> attachmentUrls = [];
+    if (_pickedFiles.isNotEmpty) {
+      // Show upload status
+      // Note: In a real app we might want a separate robust progress,
+      // but here we just block the submit button with _isCreating state.
+      // We can iterate and upload.
+      final storageService = StorageService();
+      // Generate a temporary ID if we want, or just use a timestamp for folder
+      final now = DateTime.now();
+      final tempTaskId = now.millisecondsSinceEpoch.toString();
+      final folderPath = 'tasks/${now.year}/$tempTaskId';
+
+      for (var file in _pickedFiles) {
+        if (file.path != null) {
+          final url = await storageService.uploadFile(
+            File(file.path!),
+            folder: folderPath, // Organized by year and task
+          );
+          if (url != null) {
+            // Append original file name for display purposes
+            final namedUrl =
+                '$url?originalName=${Uri.encodeComponent(file.name)}';
+            attachmentUrls.add(namedUrl);
+          } else {
+            // Track failures
+            // In a real app we might retry or structured error handling
+            // For now we just wont add it.
+            debugPrint('Failed to upload file: ${file.name}');
+          }
+        }
+      }
+    }
+
     final dueDateTime = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -235,6 +310,16 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       _selectedTime.hour,
       _selectedTime.minute,
     );
+
+    int failedCount = _pickedFiles.length - attachmentUrls.length;
+    if (failedCount > 0) {
+      _showSnackBar(
+        '$failedCount file(s) failed to upload. Task created with ${attachmentUrls.length} attachments.',
+        Colors.orange,
+      );
+    } else {
+      _showSnackBar('Task created successfully', Colors.green);
+    }
 
     if (dueDateTime.isBefore(DateTime.now())) {
       _showSnackBar('Due time must be in the future', Colors.red);
@@ -306,20 +391,28 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       assigneeNames: assigneeNames,
       dueDate: dueDateTime,
       creator: creatorId,
+      attachments: attachmentUrls, // Add attachments
     );
     await taskService.createTask(newTask);
 
     if (!mounted) return;
 
     setState(() => _isCreating = false);
-    _showSnackBar('Task created successfully', Colors.green);
+    // Success message moved up to handle partial failures logic
+    // _showSnackBar('Task created successfully', Colors.green);
     Navigator.pop(context);
   }
 
   void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating, // Floating behavior
+        margin: const EdgeInsets.all(16), // Margin for floating look
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   @override
@@ -634,6 +727,76 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 24),
+
+                const SizedBox(height: 24),
+
+                // --- Attachments Section ---
+                _buildLabel('Attachments (Optional)'),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50], // Light gray background
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_pickedFiles.isNotEmpty)
+                        Column(
+                          children: _pickedFiles.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final file = entry.value;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: ListTile(
+                                dense: true,
+                                leading: const Icon(
+                                  Icons.attach_file,
+                                  color: Colors.blue,
+                                ),
+                                title: Text(
+                                  file.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(
+                                    Icons.close,
+                                    size: 18,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => _removeFile(index),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _pickFiles,
+                          icon: const Icon(Icons.add_circle_outline),
+                          label: const Text('Add File (PDF, DOC, Images)'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
 
                 // Date & Time Selection
