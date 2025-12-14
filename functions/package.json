@@ -1,0 +1,11 @@
+{
+  "name": "functions",
+  "description": "Cloud Functions for Keitask Management",
+  "engines": {
+    "node": "18"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^4.4.0"
+  }
+}

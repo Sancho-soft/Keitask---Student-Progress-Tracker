@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+
+      // Create: only authenticated users; creator must be request.auth.uid
+      allow create: if isSignedIn() && request.resource.data.creator == request.auth.uid;
+
+      // Update: enforce allowed transitions and roles
+      allow update: if isSignedIn() && (
+        // Admin can approve/reject from pending or resubmitted
+        (isAdmin() && (
+          (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'approved') ||
+          (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'rejected' &&
+            request.resource.data.rejectionReason is string && request.resource.data.rejectionReason.size() > 0) ||
+          // Admin may perform no-status edits as long as they don't downgrade approved/completed
+          (resource.data.status == request.resource.data.status)
+        ))
+        ||
+        // Assignee can resubmit when rejected, and complete when pending/resubmitted
+        // Assignee can resubmit when rejected, and complete when pending/resubmitted
+        ((resource.data.assignee == request.auth.uid) && (
+          // Status transitions
+          (resource.data.status == 'rejected' && request.resource.data.status == 'resubmitted') ||
+          (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'completed') ||
+          // Allow edits to submissions/notes WITHOUT changing status (e.g. adding files)
+          (resource.data.status == request.resource.data.status && 
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissions', 'notes']))
+        ))
+      );
+
+      // Only admin can delete tasks
+      allow delete: if isAdmin();
+    }
+
+    // Users collection: users can read, a user can update their own profile
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
