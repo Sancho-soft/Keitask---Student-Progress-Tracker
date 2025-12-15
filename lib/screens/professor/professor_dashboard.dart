@@ -165,264 +165,278 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         myCreatedTasks.sort((a, b) => (b.id).compareTo(a.id));
         final recentTasks = myCreatedTasks.take(3).toList();
 
-        return SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- Header: Teal Gradient ---
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 24),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF00695C), // Teal 800
-                          Color(0xFF4DB6AC), // Teal 300
-                        ],
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(30),
-                        bottomRight: Radius.circular(30),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.teal.withAlpha(50),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Builder(
-                                builder: (ctx) {
-                                  final displayUser =
-                                      auth.appUser ?? widget.user;
-                                  return CircleAvatar(
-                                    radius: 26,
-                                    backgroundColor: Colors.white,
-                                    backgroundImage:
-                                        (displayUser.profileImage != null &&
-                                            displayUser
-                                                .profileImage!
-                                                .isNotEmpty)
-                                        ? NetworkImage(
-                                            displayUser.profileImage!,
-                                          )
-                                        : null,
-                                    child:
-                                        (displayUser.profileImage == null ||
-                                            displayUser.profileImage!.isEmpty)
-                                        ? Text(
-                                            displayUser.name.isNotEmpty
-                                                ? displayUser.name[0]
-                                                      .toUpperCase()
-                                                : '?',
-                                            style: const TextStyle(
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.teal,
-                                            ),
-                                          )
-                                        : null,
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hi, ${(auth.appUser?.name ?? widget.user.name)}!',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Professor Dashboard',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withAlpha(200),
-                                  ),
-                                ),
-                              ],
-                            ),
+        return SizedBox.expand(
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- Header: Teal Gradient ---
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 24),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFF00695C), // Teal 800
+                            Color(0xFF4DB6AC), // Teal 300
                           ],
                         ),
-                        // Notification Icon
-                        StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('notifications')
-                              .where('recipientId', isEqualTo: widget.user.id)
-                              .orderBy('createdAt', descending: true)
-                              .limit(50)
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasError) {
-                              return const Icon(
-                                Icons.notifications_off,
-                                color: Colors.white54,
-                              );
-                            }
-
-                            final notifications = snapshot.data?.docs ?? [];
-                            final unreadCount = notifications
-                                .where(
-                                  (doc) =>
-                                      !(doc.data()
-                                          as Map<String, dynamic>)['read'],
-                                )
-                                .length;
-
-                            return Stack(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(30),
+                          bottomRight: Radius.circular(30),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.teal.withAlpha(50),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
                               children: [
                                 Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withAlpha(30),
-                                    borderRadius: BorderRadius.circular(12),
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
                                   ),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.notifications_none_rounded,
-                                      size: 26,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      _showNotificationsSheet(
-                                        context,
-                                        notifications,
+                                  child: Builder(
+                                    builder: (ctx) {
+                                      final displayUser =
+                                          auth.appUser ?? widget.user;
+                                      return CircleAvatar(
+                                        radius: 26,
+                                        backgroundColor: Colors.white,
+                                        backgroundImage:
+                                            (displayUser.profileImage != null &&
+                                                displayUser
+                                                    .profileImage!
+                                                    .isNotEmpty)
+                                            ? NetworkImage(
+                                                displayUser.profileImage!,
+                                              )
+                                            : null,
+                                        child:
+                                            (displayUser.profileImage == null ||
+                                                displayUser
+                                                    .profileImage!
+                                                    .isEmpty)
+                                            ? Text(
+                                                displayUser.name.isNotEmpty
+                                                    ? displayUser.name[0]
+                                                          .toUpperCase()
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.teal,
+                                                ),
+                                              )
+                                            : null,
                                       );
                                     },
                                   ),
                                 ),
-                                if (unreadCount > 0)
-                                  Positioned(
-                                    right: 12,
-                                    top: 12,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(
-                                        color: Colors.redAccent,
-                                        shape: BoxShape.circle,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Hi, ${(auth.appUser?.name ?? widget.user.name)}!',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: 0.5,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
-                                      constraints: const BoxConstraints(
-                                        minWidth: 8,
-                                        minHeight: 8,
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Professor Dashboard',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white.withAlpha(200),
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Notification Icon
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('notifications')
+                                .where('recipientId', isEqualTo: widget.user.id)
+                                .orderBy('createdAt', descending: true)
+                                .limit(50)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasError) {
+                                return const Icon(
+                                  Icons.notifications_off,
+                                  color: Colors.white54,
+                                );
+                              }
+
+                              final notifications = snapshot.data?.docs ?? [];
+                              final unreadCount = notifications
+                                  .where(
+                                    (doc) =>
+                                        !(doc.data()
+                                            as Map<String, dynamic>)['read'],
+                                  )
+                                  .length;
+
+                              return Stack(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(30),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.notifications_none_rounded,
+                                        size: 26,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        _showNotificationsSheet(
+                                          context,
+                                          notifications,
+                                        );
+                                      },
                                     ),
                                   ),
-                              ],
-                            );
+                                  if (unreadCount > 0)
+                                    Positioned(
+                                      right: 12,
+                                      top: 12,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.redAccent,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        constraints: const BoxConstraints(
+                                          minWidth: 8,
+                                          minHeight: 8,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- Status Cards Grid ---
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.25,
+                      children: [
+                        _buildStatCard(
+                          stat1Label,
+                          '$stat1Count',
+                          stat1Color.withAlpha(50),
+                          stat1Color,
+                          stat1Icon,
+                        ),
+                        _buildStatCard(
+                          stat2Label,
+                          '$stat2Count',
+                          stat2Color.withAlpha(50),
+                          stat2Color,
+                          stat2Icon,
+                        ),
+                        _buildStatCard(
+                          stat3Label,
+                          '$stat3Count',
+                          stat3Color.withAlpha(50),
+                          stat3Color,
+                          stat3Icon,
+                        ),
+                        _buildMiniLeaderboardCard(),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- Recent Submissions ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Recent Created Tasks',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            if (widget.onSeeAllTasks != null) {
+                              widget.onSeeAllTasks!();
+                            } else {
+                              Navigator.pushNamed(
+                                context,
+                                '/tasks',
+                                arguments: widget.user,
+                              ).then((_) => _refresh());
+                            }
                           },
+                          child: const Text(
+                            'See all',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-
-                  // --- Status Cards Grid ---
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.25,
-                    children: [
-                      _buildStatCard(
-                        stat1Label,
-                        '$stat1Count',
-                        stat1Color.withAlpha(50),
-                        stat1Color,
-                        stat1Icon,
-                      ),
-                      _buildStatCard(
-                        stat2Label,
-                        '$stat2Count',
-                        stat2Color.withAlpha(50),
-                        stat2Color,
-                        stat2Icon,
-                      ),
-                      _buildStatCard(
-                        stat3Label,
-                        '$stat3Count',
-                        stat3Color.withAlpha(50),
-                        stat3Color,
-                        stat3Icon,
-                      ),
-                      _buildMiniLeaderboardCard(),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // --- Recent Submissions ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Recent Created Tasks',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          if (widget.onSeeAllTasks != null) {
-                            widget.onSeeAllTasks!();
-                          } else {
-                            Navigator.pushNamed(
-                              context,
-                              '/tasks',
-                              arguments: widget.user,
-                            ).then((_) => _refresh());
-                          }
-                        },
-                        child: const Text(
-                          'See all',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(height: 12),
+                    recentTasks.isEmpty
+                        ? Center(child: _buildEmptyTasksPlaceholder())
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: recentTasks.length,
+                            itemBuilder: (context, index) {
+                              final task = recentTasks[index];
+                              return _buildRecentTaskCard(task);
+                            },
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  recentTasks.isEmpty
-                      ? Center(child: _buildEmptyTasksPlaceholder())
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: recentTasks.length,
-                          itemBuilder: (context, index) {
-                            final task = recentTasks[index];
-                            return _buildRecentTaskCard(task);
-                          },
-                        ),
-                  const SizedBox(height: 16),
-                ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           ),

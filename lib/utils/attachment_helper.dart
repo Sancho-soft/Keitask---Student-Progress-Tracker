@@ -43,53 +43,16 @@ class AttachmentHelper {
           mode: LaunchMode.externalApplication,
         );
       } else {
+        if (!context.mounted) return;
         _showError(context, 'Could not open Google Docs Viewer');
       }
       return;
     }
 
-    // 2. PDF Handling with Cloudinary Workaround
+    // 2. PDF Handling
     if (lowerUrl.endsWith('.pdf')) {
-      // Try Cloudinary transformation URL if it's a Cloudinary link
-      String pdfUrl = cleanUrl;
-
-      if (cleanUrl.contains('cloudinary.com')) {
-        // Add fl_attachment flag to force download/view even if private
-        // This works by inserting the flag before the version number
-        final cloudinaryPattern = RegExp(
-          r'(https://res\.cloudinary\.com/[^/]+/[^/]+/upload/)',
-        );
-        if (cloudinaryPattern.hasMatch(cleanUrl)) {
-          pdfUrl = cleanUrl.replaceFirst(
-            cloudinaryPattern,
-            '${cloudinaryPattern.firstMatch(cleanUrl)!.group(1)}fl_attachment/',
-          );
-          debugPrint('Using Cloudinary transformation URL: $pdfUrl');
-        }
-      }
-
-      // Try Google Docs Viewer as primary method for PDFs
-      final googleDocsUrl =
-          'https://docs.google.com/viewer?url=${Uri.encodeComponent(pdfUrl)}&embedded=true';
-
-      if (await canLaunchUrl(Uri.parse(googleDocsUrl))) {
-        await launchUrl(
-          Uri.parse(googleDocsUrl),
-          mode: LaunchMode.externalApplication,
-        );
-        return;
-      }
-
-      // Fallback: Try direct URL with transformation
-      if (await canLaunchUrl(Uri.parse(pdfUrl))) {
-        await launchUrl(
-          Uri.parse(pdfUrl),
-          mode: LaunchMode.externalApplication,
-        );
-        return;
-      }
-
-      // Last resort: Try original clean URL
+      // Direct launch is often more reliable on mobile devices than Google Docs Viewer
+      // especially if the URL has authentication tokens or specific headers.
       if (await canLaunchUrl(Uri.parse(cleanUrl))) {
         await launchUrl(
           Uri.parse(cleanUrl),
@@ -98,10 +61,8 @@ class AttachmentHelper {
         return;
       }
 
-      _showError(
-        context,
-        'Could not open PDF. Please check file permissions in Cloudinary.',
-      );
+      if (!context.mounted) return;
+      _showError(context, 'Could not open PDF file.');
       return;
     }
 
@@ -125,6 +86,7 @@ class AttachmentHelper {
         mode: LaunchMode.externalApplication,
       );
     } else {
+      if (!context.mounted) return;
       _showError(context, 'Could not launch file');
     }
   }
@@ -149,6 +111,7 @@ class AttachmentHelper {
         mode: LaunchMode.externalApplication,
       );
     } else {
+      if (!context.mounted) return;
       _showError(context, 'Could not download file');
     }
   }

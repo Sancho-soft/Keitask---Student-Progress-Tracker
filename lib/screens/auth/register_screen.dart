@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/auth_service.dart';
 import 'email_verification_screen.dart';
+import '../../widgets/philippine_address_selector.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -229,10 +230,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 _buildDatePickerField(),
                 const SizedBox(height: 16),
 
-                _buildTextField(
-                  controller: _addressController,
-                  label: 'Address',
-                  hint: 'Enter your address',
+                // _buildTextField(
+                //   controller: _addressController,
+                //   label: 'Address',
+                //   hint: 'Enter your address',
+                // ),
+                const Text(
+                  'Address',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                PhilippineAddressSelector(
+                  onAddressChanged: (address) {
+                    setState(() {
+                      _addressController.text = address;
+                    });
+                  },
                 ),
                 const SizedBox(height: 16),
 

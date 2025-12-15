@@ -181,7 +181,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ProfessorTasksScreen(
           user: widget.user,
         ), // Professor sees ProfessorTasksScreen
-        const SizedBox(), // Placeholder for "New Task" (handled in _onTabSelected)
+        Container(), // Placeholder for "New Task" (handled in _onTabSelected)
         const LeaderboardScreen(), // Professor Leaderboard (was Analytics)
         ProfileScreen(user: widget.user, onBackToHome: _backToHome),
       ];

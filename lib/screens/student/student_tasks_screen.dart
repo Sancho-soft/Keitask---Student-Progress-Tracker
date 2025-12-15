@@ -8,6 +8,7 @@ import '../../services/auth_service.dart';
 
 import 'task_submission_screen.dart';
 import '../../utils/attachment_helper.dart';
+import 'calendar_screen.dart';
 
 class StudentTasksScreen extends StatefulWidget {
   final User? user;
@@ -113,9 +114,6 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
   @override
   Widget build(BuildContext context) {
     final firestore = Provider.of<FirestoreTaskService>(context);
-    // Fix: Robustly resolve user to ensure role checks work
-    final effectiveUser =
-        widget.user ?? Provider.of<AuthService>(context).appUser;
 
     final monthYear =
         '${_getMonthName(_currentDisplayedDate.month)} ${_currentDisplayedDate.year}';
@@ -148,324 +146,390 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
           IconButton(
             icon: const Icon(Icons.calendar_today, color: Colors.black87),
             onPressed: () {
-              _scrollToDate(DateTime.now());
-              setState(() {
-                _selectedDate = DateTime.now();
-                _currentDisplayedDate = DateTime.now();
-              });
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CalendarScreen(
+                    user:
+                        widget.user ??
+                        Provider.of<AuthService>(context).appUser,
+                  ),
+                ),
+              );
             },
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 100), // Spacing for extendBodyBehindAppBar
-          // Date Selector (Infinite Scroll)
-          Container(
-            height: 100, // Increased height to prevent overflow
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: ListView.builder(
-              controller: _dateScrollController,
-              scrollDirection: Axis.horizontal,
-              itemCount: 1000, // Range: Today - 365 to Today + 635
-              itemBuilder: (context, index) {
-                // index 365 is today
-                final dayOffset = index - 365;
-                final date = DateTime.now().add(Duration(days: dayOffset));
-                final isSelected =
-                    date.year == _selectedDate.year &&
-                    date.month == _selectedDate.month &&
-                    date.day == _selectedDate.day;
+      body: StreamBuilder<List<Task>>(
+        stream: firestore.tasksStream(),
+        builder: (context, snapshot) {
+          final allTasks = snapshot.data ?? [];
+          final effectiveUser =
+              widget.user ?? Provider.of<AuthService>(context).appUser;
 
-                final isToday =
-                    date.year == DateTime.now().year &&
-                    date.month == DateTime.now().month &&
-                    date.day == DateTime.now().day;
-
-                final daysOfWeek = [
-                  'Mon',
-                  'Tue',
-                  'Wed',
-                  'Thu',
-                  'Fri',
-                  'Sat',
-                  'Sun',
-                ];
-                final dayName = daysOfWeek[date.weekday - 1];
-
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedDate = DateTime(date.year, date.month, date.day);
-                    });
-                    _scrollToDate(date);
-                  },
-                  child: Container(
-                    width: 50,
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Theme.of(context).primaryColor
-                          : Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(25), // Capsule shape
-                      border: isSelected
-                          ? null
-                          : Border.all(
-                              color: isToday
-                                  ? Theme.of(
-                                      context,
-                                    ).primaryColor.withAlpha(100)
-                                  : Theme.of(context).dividerColor,
-                            ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: Theme.of(
-                                  context,
-                                ).primaryColor.withAlpha(100),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          dayName.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: isSelected ? Colors.white70 : Colors.grey,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: 30,
-                          height: 30,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white.withAlpha(50)
-                                : Colors.transparent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            '${date.day}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isSelected
-                                  ? Colors.white
-                                  : Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        if (isToday && !isSelected)
-                          Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            width: 4,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).primaryColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Tasks for ${_selectedDate.day == DateTime.now().day && _selectedDate.month == DateTime.now().month ? "Today" : _formatDateDay(_selectedDate)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => setState(() => _showAllTasks = !_showAllTasks),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _showAllTasks
-                          ? Theme.of(context).primaryColor
-                          : Theme.of(context).dividerColor.withAlpha(50),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _showAllTasks ? 'Show All' : 'Show Daily',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _showAllTasks
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: StreamBuilder<List<Task>>(
-              stream: firestore.tasksStream(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final allTasks = snapshot.data ?? [];
-
-                if (effectiveUser == null) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.task_alt, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No user selected',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final userTasks = allTasks.where((task) {
-                  // For professors, show tasks they created OR tasks assigned to them
-                  // For students/others, show tasks assigned to them or created by them
-                  final matchesUser =
-                      task.assignees.contains(effectiveUser.id) ||
+          // Filter tasks relevant to this user (for dots and list)
+          final relevantTasks = effectiveUser == null
+              ? <Task>[]
+              : allTasks.where((task) {
+                  return task.assignees.contains(effectiveUser.id) ||
                       task.creator == effectiveUser.id;
-
-                  if (_showAllTasks) {
-                    return matchesUser;
-                  }
-
-                  final matchesDate =
-                      task.dueDate.year == _selectedDate.year &&
-                      task.dueDate.month == _selectedDate.month &&
-                      task.dueDate.day == _selectedDate.day;
-                  return matchesUser && matchesDate;
                 }).toList();
 
-                if (userTasks.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withAlpha(10),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.event_available,
-                            size: 48,
-                            color: Colors.blue[300],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _showAllTasks
-                              ? 'No tasks found'
-                              : 'No tasks for ${_formatDateDay(_selectedDate)}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (!_showAllTasks)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: TextButton(
-                              onPressed: () =>
-                                  setState(() => _showAllTasks = true),
-                              child: const Text('View all tasks'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }
-
-                // If an initial taskId is provided, attempt to focus the related task
-                if (_pendingTaskId != null) {
-                  final matching = allTasks
-                      .where((t) => t.id == _pendingTaskId)
-                      .toList();
-                  if (matching.isNotEmpty) {
-                    final found = matching.first;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      // Show action sheet for the task
-                      _showTaskActionsSheet(
-                        context,
-                        found,
-                        Provider.of<FirestoreTaskService>(
-                          context,
-                          listen: false,
-                        ),
-                        effectiveUser,
-                      );
-                    });
-                  }
-                  // Clear pending task id
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _pendingTaskId = null;
-                  });
-                }
-
-                // Sort: Bookmarked first, then by Due Date (soonest first)
-                userTasks.sort((a, b) {
-                  final isBookmarkedA =
-                      a.bookmarkedBy?.contains(effectiveUser.id) ?? false;
-                  final isBookmarkedB =
-                      b.bookmarkedBy?.contains(effectiveUser.id) ?? false;
-
-                  if (isBookmarkedA && !isBookmarkedB) return -1;
-                  if (!isBookmarkedA && isBookmarkedB) return 1;
-                  return a.dueDate.compareTo(b.dueDate);
-                });
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: userTasks.length,
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 100), // Spacing for extendBodyBehindAppBar
+              // Date Selector (Infinite Scroll)
+              Container(
+                height: 100, // Increased height to prevent overflow
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: ListView.builder(
+                  controller: _dateScrollController,
+                  scrollDirection: Axis.horizontal,
+                  itemCount: 1000, // Range: Today - 365 to Today + 635
                   itemBuilder: (context, index) {
-                    final task = userTasks[index];
-                    return _buildTaskCard(
-                      context,
-                      task,
-                      Provider.of<FirestoreTaskService>(context),
-                      effectiveUser,
+                    // index 365 is today
+                    final dayOffset = index - 365;
+                    final date = DateTime.now().add(Duration(days: dayOffset));
+                    final isSelected =
+                        date.year == _selectedDate.year &&
+                        date.month == _selectedDate.month &&
+                        date.day == _selectedDate.day;
+
+                    final isToday =
+                        date.year == DateTime.now().year &&
+                        date.month == DateTime.now().month &&
+                        date.day == DateTime.now().day;
+
+                    // Check for tasks on this date
+                    final tasksForDay = relevantTasks
+                        .where(
+                          (t) =>
+                              t.dueDate.year == date.year &&
+                              t.dueDate.month == date.month &&
+                              t.dueDate.day == date.day &&
+                              t.status != 'completed',
+                        )
+                        .toList();
+
+                    final daysOfWeek = [
+                      'Mon',
+                      'Tue',
+                      'Wed',
+                      'Thu',
+                      'Fri',
+                      'Sat',
+                      'Sun',
+                    ];
+                    final dayName = daysOfWeek[date.weekday - 1];
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedDate = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                          );
+                        });
+                        _scrollToDate(date);
+                      },
+                      child: Container(
+                        width: 50,
+                        margin: const EdgeInsets.symmetric(horizontal: 5),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).primaryColor
+                              : Theme.of(context).cardColor,
+                          borderRadius: BorderRadius.circular(
+                            25,
+                          ), // Capsule shape
+                          border: isSelected
+                              ? null
+                              : Border.all(
+                                  color: isToday
+                                      ? Theme.of(
+                                          context,
+                                        ).primaryColor.withAlpha(100)
+                                      : Theme.of(context).dividerColor,
+                                ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withAlpha(100),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              dayName.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: isSelected
+                                    ? Colors.white70
+                                    : Colors.grey,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              width: 30,
+                              height: 30,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withAlpha(50)
+                                    : Colors.transparent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${date.day}',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            // Task Indicator Dots (Max 3)
+                            if (tasksForDay.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List.generate(
+                                    tasksForDay.length > 3
+                                        ? 3
+                                        : tasksForDay.length,
+                                    (index) => Container(
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 1.5,
+                                      ),
+                                      width: 4,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.redAccent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (isToday && !isSelected)
+                              Container(
+                                margin: const EdgeInsets.only(top: 4),
+                                width: 4,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).primaryColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     );
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _showAllTasks
+                          ? 'All Tasks'
+                          : 'Tasks for ${_selectedDate.day == DateTime.now().day && _selectedDate.month == DateTime.now().month ? "Today" : _formatDateDay(_selectedDate)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _showAllTasks = !_showAllTasks),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _showAllTasks
+                              ? Theme.of(context).primaryColor
+                              : Theme.of(context).dividerColor.withAlpha(50),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _showAllTasks ? 'Show All' : 'Show Daily',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _showAllTasks
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Expanded(
+                child: Builder(
+                  builder: (context) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (effectiveUser == null) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.task_alt,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No user selected',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final userTasks = relevantTasks.where((task) {
+                      if (_showAllTasks) {
+                        return true;
+                      }
+                      final matchesDate =
+                          task.dueDate.year == _selectedDate.year &&
+                          task.dueDate.month == _selectedDate.month &&
+                          task.dueDate.day == _selectedDate.day;
+                      return matchesDate;
+                    }).toList();
+
+                    if (userTasks.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withAlpha(10),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.event_available,
+                                size: 48,
+                                color: Colors.blue[300],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _showAllTasks
+                                  ? 'No tasks found'
+                                  : 'No tasks for ${_formatDateDay(_selectedDate)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (!_showAllTasks)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: TextButton(
+                                  onPressed: () =>
+                                      setState(() => _showAllTasks = true),
+                                  child: const Text('View all tasks'),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    // If an initial taskId is provided, attempt to focus the related task
+                    if (_pendingTaskId != null) {
+                      final matching = userTasks
+                          .where((t) => t.id == _pendingTaskId)
+                          .toList();
+                      if (matching.isNotEmpty) {
+                        final found = matching.first;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          // Show action sheet for the task
+                          _showTaskActionsSheet(
+                            context,
+                            found,
+                            firestore,
+                            effectiveUser,
+                          );
+                        });
+                      }
+                      // Clear pending task id
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _pendingTaskId = null;
+                      });
+                    }
+
+                    // Sort: Bookmarked first, then by Due Date (soonest first)
+                    // Sort: Bookmarked first, then by Due Date (soonest first)
+                    userTasks.sort((a, b) {
+                      final isBookmarkedA =
+                          a.bookmarkedBy?.contains(effectiveUser.id) ?? false;
+                      final isBookmarkedB =
+                          b.bookmarkedBy?.contains(effectiveUser.id) ?? false;
+
+                      if (isBookmarkedA && !isBookmarkedB) return -1;
+                      if (!isBookmarkedA && isBookmarkedB) return 1;
+                      return a.dueDate.compareTo(b.dueDate);
+                    });
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: userTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = userTasks[index];
+                        return _buildTaskCard(
+                          context,
+                          task,
+                          firestore,
+                          effectiveUser,
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -893,13 +957,16 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
 
     final isRejected = task.status == 'rejected';
     final statusText = getTaskStatus();
+    final isPending = task.status == 'pending';
     final statusColor = isCompleted
         ? Colors.green
         : (isApproved
               ? Colors.green
               : (isOverdue
                     ? Colors.red
-                    : (isRejected ? Colors.red : Colors.blue)));
+                    : (isRejected
+                          ? Colors.red
+                          : (isPending ? Colors.orange : Colors.blue))));
 
     final isBookmarked =
         effectiveUser != null &&

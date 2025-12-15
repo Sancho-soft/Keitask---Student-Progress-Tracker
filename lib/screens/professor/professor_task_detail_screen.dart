@@ -108,6 +108,73 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
               height: 1.5,
             ),
           ),
+          // Attachments Section
+          if (_currentTask.attachments != null &&
+              _currentTask.attachments!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Attachments',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 100,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: _currentTask.attachments!.length,
+                itemBuilder: (context, index) {
+                  final url = _currentTask.attachments![index];
+                  final uri = Uri.parse(url);
+                  final fileName =
+                      uri.queryParameters['originalName'] ??
+                      url.split('/').last.split('?').first;
+                  final isPdf = url.toLowerCase().contains('.pdf');
+                  final isImage =
+                      url.toLowerCase().contains('.jpg') ||
+                      url.toLowerCase().contains('.jpeg') ||
+                      url.toLowerCase().contains('.png');
+
+                  return GestureDetector(
+                    onTap: () => AttachmentHelper.openAttachment(context, url),
+                    child: Container(
+                      width: 80,
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isPdf
+                                ? Icons.picture_as_pdf
+                                : (isImage ? Icons.image : Icons.description),
+                            color: isPdf
+                                ? Colors.red
+                                : (isImage ? Colors.purple : Colors.blue),
+                            size: 32,
+                          ),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              fileName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -380,54 +447,103 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
               ),
             ),
           ),
+          actionsAlignment: MainAxisAlignment.center,
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
-            if (!isGraded)
-              TextButton(
-                onPressed: () {
-                  // Reject Logic
-                  Navigator.pop(dialogContext);
-                  _showRejectDialog(context, task.id);
-                },
-                child: const Text(
-                  'Reject (Resubmit)',
-                  style: TextStyle(color: Colors.red),
+            if (!isGraded) ...[
+              // Row 1: Submit Grade button (full width)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    final score = double.tryParse(scoreController.text) ?? 0.0;
+
+                    if (score < 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Score cannot be negative'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (score > 100) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Score cannot exceed 100'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final feedback = feedbackController.text;
+
+                    final grade = Grade(
+                      score: score,
+                      maxScore: 100.0,
+                      comment: feedback,
+                      gradedAt: DateTime.now(),
+                      gradedBy: widget.user.id,
+                    );
+
+                    await Provider.of<FirestoreTaskService>(
+                      context,
+                      listen: false,
+                    ).gradeTask(task.id, studentId, grade);
+
+                    if (context.mounted) Navigator.pop(dialogContext);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Submit Grade'),
                 ),
               ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Close'),
-            ),
-            if (!isGraded)
-              ElevatedButton(
-                onPressed: () async {
-                  final score = double.tryParse(scoreController.text) ?? 0.0;
-
-                  if (score > 100) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Score cannot exceed 100')),
-                    );
-                    return;
-                  }
-
-                  final feedback = feedbackController.text;
-
-                  final grade = Grade(
-                    score: score,
-                    maxScore: 100.0,
-                    comment: feedback,
-                    gradedAt: DateTime.now(),
-                    gradedBy: widget.user.id,
-                  );
-
-                  await Provider.of<FirestoreTaskService>(
-                    context,
-                    listen: false,
-                  ).gradeTask(task.id, studentId, grade);
-
-                  if (context.mounted) Navigator.pop(dialogContext);
-                },
-                child: const Text('Submit Grade'),
+              const SizedBox(height: 8),
+              // Row 2: Reject and Close buttons (side by side)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        // Reject Logic
+                        Navigator.pop(dialogContext);
+                        _showRejectDialog(context, task.id);
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        'Reject (Resubmit)',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ],
               ),
+            ] else ...[
+              // For graded submissions, just show Close button
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
           ],
         );
       },
