@@ -26,8 +26,9 @@ class Task {
   final Map<String, Grade>? grades; // Map<UserId, Grade>
   final List<String>? attachments; // List of file URLs
   final Map<String, DateTime>? completionStatus; // Map<UserId, CompletedAt>
-  final Map<String, List<String>>? submissions; // Map<UserId, List<FileUrl>>
-  final Map<String, String>? submissionNotes; // Map<UserId, Note>
+  final Map<String, List<dynamic>>?
+  submissions; // Map<UserId, List<FileObject|String>>
+  final Map<String, String>? submissionNotes;
 
   Task({
     required this.id,
@@ -93,14 +94,12 @@ class Task {
       });
     }
 
-    Map<String, List<String>>? submissionsMap;
+    Map<String, List<dynamic>>? submissionsMap;
     if (json['submissions'] != null) {
       submissionsMap = {};
       (json['submissions'] as Map<String, dynamic>).forEach((key, value) {
         if (value is List) {
-          submissionsMap![key] = List<String>.from(
-            value.map((e) => e.toString()),
-          );
+          submissionsMap![key] = List<dynamic>.from(value);
         }
       });
     }

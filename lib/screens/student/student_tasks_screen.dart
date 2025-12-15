@@ -873,7 +873,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                       }
                     } else {
                       // Student View
-                      List<String>? myUrls;
+                      List<dynamic>? myUrls;
 
                       // 1. Try Direct ID Match
                       if (safeUser != null && task.submissions != null) {

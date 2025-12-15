@@ -493,25 +493,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // --- HELPER WIDGETS ---
 
   Widget _buildLogo() {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Image.asset(
-        'assets/images/icons/logo_keitask.png',
-        width: 200,
-        height: 200,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.task, size: 100, color: Colors.teal),
-      ),
+    return Image.asset(
+      'assets/images/icons/logo_keitask.png',
+      width: 200,
+      height: 200,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) =>
+          const Icon(Icons.task, size: 100, color: Colors.teal),
     );
   }
 

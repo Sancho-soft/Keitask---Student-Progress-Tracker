@@ -96,7 +96,7 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
       context,
       listen: false,
     );
-    final uploadedUrls = <String>[];
+    final uploadedFiles = <Map<String, dynamic>>[];
 
     try {
       // Upload files
@@ -117,7 +117,7 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
         );
 
         if (url != null) {
-          uploadedUrls.add(url);
+          uploadedFiles.add({'url': url, 'name': file.name});
         }
       }
 
@@ -125,7 +125,7 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
       await firestoreService.submitTask(
         widget.task.id,
         widget.user.id,
-        uploadedUrls,
+        uploadedFiles,
         notes: _notesController.text.trim(),
       );
 

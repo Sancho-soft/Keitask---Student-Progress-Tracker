@@ -10,7 +10,7 @@ import '../../utils/attachment_helper.dart';
 class SubmissionDetailsDialog extends StatefulWidget {
   final Task task;
   final String studentId;
-  final List<String> submissionUrls;
+  final List<dynamic> submissionUrls;
   final User viewer;
 
   const SubmissionDetailsDialog({
@@ -128,13 +128,25 @@ class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
                   'No documents submitted.',
                   style: TextStyle(fontStyle: FontStyle.italic),
                 ),
-              ...widget.submissionUrls.map((url) {
+              ...widget.submissionUrls.map((fileItem) {
+                String url;
+                String name;
+
+                if (fileItem is String) {
+                  url = fileItem;
+                  name = url.split('/').last.split('?').first;
+                } else if (fileItem is Map) {
+                  url = fileItem['url'] ?? '';
+                  name = fileItem['name'] ?? 'Unknown File';
+                } else {
+                  return const SizedBox.shrink();
+                }
+
+                if (url.isEmpty) return const SizedBox.shrink();
+
                 final isImage = _isImage(url);
                 final isPdf = url.toLowerCase().contains('.pdf');
-                final uri = Uri.parse(url);
-                final fileName =
-                    uri.queryParameters['originalName'] ??
-                    url.split('/').last.split('?').first;
+                final fileName = name;
                 final shortName = fileName.length > 30
                     ? '${fileName.substring(0, 30)}...'
                     : fileName;

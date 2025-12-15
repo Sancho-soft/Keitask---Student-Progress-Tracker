@@ -51,11 +51,21 @@ class AttachmentHelper {
 
     // 2. PDF Handling
     if (lowerUrl.endsWith('.pdf')) {
-      // Direct launch is often more reliable on mobile devices than Google Docs Viewer
-      // especially if the URL has authentication tokens or specific headers.
+      // Direct launch first
       if (await canLaunchUrl(Uri.parse(cleanUrl))) {
-        await launchUrl(
+        final launched = await launchUrl(
           Uri.parse(cleanUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return;
+      }
+
+      // Fallback: Google Docs Viewer
+      final googleDocsUrl =
+          'https://docs.google.com/viewer?url=${Uri.encodeComponent(cleanUrl)}';
+      if (await canLaunchUrl(Uri.parse(googleDocsUrl))) {
+        await launchUrl(
+          Uri.parse(googleDocsUrl),
           mode: LaunchMode.externalApplication,
         );
         return;

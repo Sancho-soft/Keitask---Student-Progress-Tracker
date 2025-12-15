@@ -252,13 +252,12 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                   ? ElevatedButton(
                       onPressed: () {
                         List<dynamic> rawFiles = submissions[studentId] ?? [];
-                        List<String> fileUrls = rawFiles.cast<String>();
 
                         _showProfessorGradingDialog(
                           context,
                           _currentTask,
                           studentId,
-                          fileUrls,
+                          rawFiles,
                           isGraded,
                         );
                       },
@@ -291,7 +290,7 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
     BuildContext context,
     Task task,
     String studentId,
-    List<String> fileUrls,
+    List<dynamic> files,
     bool isGraded,
   ) {
     final scoreController = TextEditingController();
@@ -320,10 +319,26 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  if (fileUrls.isEmpty)
+                  const SizedBox(height: 8),
+                  if (files.isEmpty)
                     const Text('No files attached.')
                   else
-                    ...fileUrls.map((url) {
+                    ...files.map((fileItem) {
+                      String url;
+                      String name;
+
+                      if (fileItem is String) {
+                        url = fileItem;
+                        name = url.split('/').last.split('?').first;
+                      } else if (fileItem is Map) {
+                        url = fileItem['url'] ?? '';
+                        name = fileItem['name'] ?? 'Unknown File';
+                      } else {
+                        return const SizedBox.shrink();
+                      }
+
+                      if (url.isEmpty) return const SizedBox.shrink();
+
                       final lower = url.toLowerCase().split('?').first;
                       final isImage =
                           lower.endsWith('.jpg') ||
@@ -332,7 +347,7 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                           lower.endsWith('.webp') ||
                           lower.endsWith('.gif');
                       final isPdf = lower.endsWith('.pdf');
-                      final fileName = url.split('/').last.split('?').first;
+                      final fileName = name;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),

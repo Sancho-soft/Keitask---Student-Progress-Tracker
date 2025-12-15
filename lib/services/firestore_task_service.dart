@@ -168,7 +168,7 @@ class FirestoreTaskService extends ChangeNotifier {
   Future<void> submitTask(
     String taskId,
     String userId,
-    List<String> fileUrls, {
+    List<dynamic> files, {
     String? notes,
   }) async {
     final taskRef = _tasksRef.doc(taskId);
@@ -179,7 +179,7 @@ class FirestoreTaskService extends ChangeNotifier {
     final currentSubmissions = Map<String, dynamic>.from(
       taskData['submissions'] ?? {},
     );
-    currentSubmissions[userId] = fileUrls;
+    currentSubmissions[userId] = files;
 
     final currentSubmissionNotes = Map<String, dynamic>.from(
       taskData['submissionNotes'] ?? {},
