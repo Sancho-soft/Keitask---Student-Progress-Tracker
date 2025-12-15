@@ -61,7 +61,7 @@ class _RegistrationSuccessDialogState extends State<RegistrationSuccessDialog>
                 width: 150,
                 height: 150,
                 child: Lottie.asset(
-                  'lib/assets/animations/Profile Avatar of Young Boy.json',
+                  'assets/animations/Profile Avatar of Young Boy.json',
                   fit: BoxFit.contain,
                 ),
               ),

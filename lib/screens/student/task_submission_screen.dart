@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:keitask_management/models/task_model.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/storage_service.dart';
@@ -260,34 +261,45 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
                     child: Container(
                       width: 100,
                       margin: const EdgeInsets.only(right: 12),
-                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.grey[100],
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey.shade300),
+                        image: isImage
+                            ? DecorationImage(
+                                image: NetworkImage(url),
+                                fit: BoxFit.cover,
+                                onError: (exception, stackTrace) {
+                                  // Fallback handled by child
+                                },
+                              )
+                            : null,
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isPdf
-                                ? Icons.picture_as_pdf
-                                : (isImage ? Icons.image : Icons.description),
-                            color: isPdf
-                                ? Colors.red
-                                : (isImage ? Colors.purple : Colors.blue),
-                            size: 32,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            fileName,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                        ],
-                      ),
+                      child: isImage
+                          ? null // content is in decoration image
+                          : Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isPdf
+                                        ? Icons.picture_as_pdf
+                                        : Icons.description,
+                                    color: isPdf ? Colors.red : Colors.blue,
+                                    size: 32,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    fileName,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                            ),
                     ),
                   );
                 },

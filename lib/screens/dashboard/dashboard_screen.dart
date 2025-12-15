@@ -6,7 +6,6 @@ import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
-
 import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard.dart';
 import '../professor/professor_dashboard.dart';
@@ -177,6 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ProfessorDashboard(
           user: widget.user,
           onSeeAllTasks: () => _onTabSelected(1), // Switch to Tasks tab
+          onGoToLeaderboard: () => _onTabSelected(3), // Switch to Rank tab
         ),
         ProfessorTasksScreen(
           user: widget.user,

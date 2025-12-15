@@ -6,7 +6,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../models/user_model.dart';
+
+import 'package:keitask_management/models/task_model.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =

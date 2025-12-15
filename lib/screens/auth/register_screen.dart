@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../services/auth_service.dart';
 import 'email_verification_screen.dart';
 import '../../widgets/philippine_address_selector.dart';
+import '../../widgets/custom_text_field.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -25,8 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
 
   String _selectedRole = 'student'; // Default role
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
+
   bool _agreeToTerms = false;
   bool _isLoading = false;
 
@@ -220,24 +220,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 32),
 
                 // Form Fields
-                _buildTextField(
+                CustomTextField(
                   controller: _nameController,
                   label: 'Full Name',
                   hint: 'Enter your full name',
                 ),
                 const SizedBox(height: 16),
 
-                _buildDatePickerField(),
+                // Birthday with CustomTextField look
+                CustomTextField(
+                  controller: _birthdayController,
+                  label: 'Birthday',
+                  hint: 'MM/DD/YYYY',
+                  readOnly: true,
+                  suffixIcon: const Icon(
+                    Icons.calendar_today,
+                    color: Colors.grey,
+                  ),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime(2000),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      _birthdayController.text =
+                          '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
+                    }
+                  },
+                ),
                 const SizedBox(height: 16),
 
-                // _buildTextField(
-                //   controller: _addressController,
-                //   label: 'Address',
-                //   hint: 'Enter your address',
-                // ),
                 const Text(
                   'Address',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF666666),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 PhilippineAddressSelector(
@@ -249,7 +270,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                _buildTextField(
+                CustomTextField(
                   controller: _phoneController,
                   label: 'Phone Number',
                   hint: 'Enter your phone number (digits only)',
@@ -260,20 +281,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Role Dropdown
                 const Text(
                   'I am a:',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF666666),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ), // Matched padding
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    border: Border.all(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFFF5F6F8),
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _selectedRole,
                       isExpanded: true,
+                      icon: const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.grey,
+                      ),
                       items: const [
                         DropdownMenuItem(
                           value: 'student',
@@ -294,7 +326,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                _buildTextField(
+                CustomTextField(
                   controller: _emailController,
                   label: 'Email',
                   hint: 'Enter your email',
@@ -302,24 +334,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                _buildPasswordField(
+                CustomTextField(
                   controller: _passwordController,
                   label: 'Password',
                   hint: 'Create a password',
-                  isObscure: _obscurePassword,
-                  toggleObscure: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
+                  isPassword: true,
                 ),
                 const SizedBox(height: 16),
 
-                _buildPasswordField(
+                CustomTextField(
                   controller: _confirmPasswordController,
                   label: 'Confirm Password',
                   hint: 'Re-enter your password',
-                  isObscure: _obscureConfirmPassword,
-                  toggleObscure: () => setState(
-                    () => _obscureConfirmPassword = !_obscureConfirmPassword,
-                  ),
+                  isPassword: true,
                 ),
                 const SizedBox(height: 24),
 
@@ -466,13 +493,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // --- HELPER WIDGETS ---
 
   Widget _buildLogo() {
-    return Image.asset(
-      'lib/assets/images/icons/logo_keitask.png',
-      width: 120, // Smaller logo for header
-      height: 120,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) =>
-          const Icon(Icons.task, size: 80, color: Colors.teal),
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Image.asset(
+        'assets/images/icons/logo_keitask.png',
+        width: 200,
+        height: 200,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.task, size: 100, color: Colors.teal),
+      ),
     );
   }
 
@@ -515,139 +554,6 @@ By accessing and using KeiTask, you accept and agree to be bound by the terms an
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.grey),
-            filled: true,
-            fillColor: Colors.grey[100],
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
-            ),
-          ),
-          keyboardType: keyboardType,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDatePickerField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Birthday',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _birthdayController,
-          readOnly: true,
-          onTap: () async {
-            final date = await showDatePicker(
-              context: context,
-              initialDate: DateTime(2000),
-              firstDate: DateTime(1900),
-              lastDate: DateTime.now(),
-            );
-            if (date != null) {
-              _birthdayController.text =
-                  '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
-            }
-          },
-          decoration: InputDecoration(
-            hintText: 'MM/DD/YYYY',
-            hintStyle: const TextStyle(color: Colors.grey),
-            filled: true,
-            fillColor: Colors.grey[100],
-            suffixIcon: const Icon(Icons.calendar_today),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required bool isObscure,
-    required VoidCallback toggleObscure,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          obscureText: isObscure,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.grey),
-            filled: true,
-            fillColor: Colors.grey[100],
-            suffixIcon: IconButton(
-              icon: Icon(isObscure ? Icons.visibility_off : Icons.visibility),
-              onPressed: toggleObscure,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey.shade400),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.blue),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

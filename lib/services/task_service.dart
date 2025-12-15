@@ -1,6 +1,6 @@
 // lib/services/task_service.dart (UPDATED - Firebase users managed by CreateTaskScreen via AuthService)
 import 'package:flutter/material.dart';
-import '../models/user_model.dart';
+import 'package:keitask_management/models/task_model.dart';
 
 class TaskService extends ChangeNotifier {
   // Cache for user names to avoid repeated lookups

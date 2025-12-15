@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import 'package:flutter/foundation.dart'; // For debugPrint
+
 class PhilippineAddressService {
   // Using PSGC API (Philippine Standard Geographic Code)
   static const String baseUrl = 'https://psgc.gitlab.io/api';
@@ -22,7 +24,7 @@ class PhilippineAddressService {
             .toList();
       }
     } catch (e) {
-      print('Error fetching regions: $e');
+      debugPrint('Error fetching regions: $e');
     }
     return [];
   }
@@ -44,7 +46,7 @@ class PhilippineAddressService {
         return data.map((e) => {'code': e['code'], 'name': e['name']}).toList();
       }
     } catch (e) {
-      print('Error fetching provinces: $e');
+      debugPrint('Error fetching provinces: $e');
     }
     return [];
   }
@@ -70,7 +72,7 @@ class PhilippineAddressService {
         return data.map((e) => {'code': e['code'], 'name': e['name']}).toList();
       }
     } catch (e) {
-      print('Error fetching cities/municipalities: $e');
+      debugPrint('Error fetching cities/municipalities: $e');
     }
     return [];
   }
@@ -93,7 +95,7 @@ class PhilippineAddressService {
         return data.map((e) => {'code': e['code'], 'name': e['name']}).toList();
       }
     } catch (e) {
-      print('Error fetching barangays: $e');
+      debugPrint('Error fetching barangays: $e');
     }
     return [];
   }

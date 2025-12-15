@@ -82,7 +82,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               // Animation
               Center(
                 child: Lottie.asset(
-                  'lib/assets/animations/forgot_password_animation.json',
+                  'assets/animations/forgot_password_animation.json',
                   height: 200,
                   fit: BoxFit.contain,
                 ),

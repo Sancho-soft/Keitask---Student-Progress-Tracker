@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:keitask_management/models/task_model.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_notification_service.dart';
 import '../../services/firestore_task_service.dart';
-import '../../models/user_model.dart'
-    as app_models; // Alias to avoid conflict if needed, though Task is in separate file usually.
+
 // Actually Task is in user_model.dart?? No, I saw it there. Yes, Task class is in user_model.dart.
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -395,7 +395,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         const SizedBox(height: 16),
 
                         // Task Status Chart
-                        StreamBuilder<List<app_models.Task>>(
+                        StreamBuilder<List<Task>>(
                           stream: Provider.of<FirestoreTaskService>(
                             context,
                             listen: false,
@@ -657,7 +657,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildTaskStatusChart(List<app_models.Task> tasks) {
+  Widget _buildTaskStatusChart(List<Task> tasks) {
     if (tasks.isEmpty) return const Center(child: Text('No tasks created yet'));
 
     final completed = tasks

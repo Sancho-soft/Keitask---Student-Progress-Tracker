@@ -24,7 +24,7 @@ class LoadingAnimation extends StatelessWidget {
             width: size,
             height: size,
             child: Lottie.asset(
-              'lib/assets/animations/Insider-loading.json',
+              'assets/animations/Insider-loading.json',
               repeat: true,
               reverse: false,
             ),

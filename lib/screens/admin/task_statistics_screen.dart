@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../services/firestore_task_service.dart';
-import '../../models/user_model.dart';
+import 'package:keitask_management/models/task_model.dart';
 
 class TaskStatisticsScreen extends StatelessWidget {
   final bool showBackButton;

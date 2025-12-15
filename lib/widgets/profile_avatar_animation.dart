@@ -22,7 +22,7 @@ class ProfileAvatarAnimation extends StatelessWidget {
           width: size,
           height: size,
           child: Lottie.asset(
-            'lib/assets/animations/Profile Avatar of Young Boy.json',
+            'assets/animations/Profile Avatar of Young Boy.json',
             fit: BoxFit.contain,
           ),
         ),

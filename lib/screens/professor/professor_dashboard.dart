@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:keitask_management/models/task_model.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
@@ -11,8 +12,14 @@ import '../../services/auth_service.dart';
 class ProfessorDashboard extends StatefulWidget {
   final User user;
   final VoidCallback? onSeeAllTasks;
+  final VoidCallback? onGoToLeaderboard;
 
-  const ProfessorDashboard({super.key, required this.user, this.onSeeAllTasks});
+  const ProfessorDashboard({
+    super.key,
+    required this.user,
+    this.onSeeAllTasks,
+    this.onGoToLeaderboard,
+  });
 
   @override
   State<ProfessorDashboard> createState() => _ProfessorDashboardState();
@@ -382,9 +389,34 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
                           stat3Color,
                           stat3Icon,
                         ),
-                        _buildMiniLeaderboardCard(),
+                        // 4. Total Students (Replaced Quick Create)
+                        // This requires a stream of users, or we can use a FutureBuilder wrapper
+                        StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .where('role', isEqualTo: 'student')
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            int count = 0;
+                            if (snapshot.hasData) {
+                              count = snapshot.data!.docs.length;
+                            }
+                            return _buildStatCard(
+                              'Total Students',
+                              '$count',
+                              Colors.purple.withAlpha(50),
+                              Colors.purple,
+                              Icons.group,
+                            );
+                          },
+                        ),
                       ],
                     ),
+                    const SizedBox(height: 24),
+
+                    // --- NEW: Premium Podium Section ---
+                    _buildPodiumSection(),
+
                     const SizedBox(height: 24),
 
                     // --- Recent Submissions ---
@@ -510,6 +542,220 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     );
   }
 
+  Widget _buildPodiumSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.emoji_events_rounded, color: Colors.amber[700]),
+            const SizedBox(width: 8),
+            Text(
+              'Top Performing Students',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.grey.withAlpha(30)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(20),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: InkWell(
+            onTap: () {
+              if (widget.onGoToLeaderboard != null) {
+                widget.onGoToLeaderboard!();
+              } else {
+                // Fallback or just do nothing if not provided
+                Navigator.pushNamed(context, '/leaderboard');
+              }
+            },
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .where('role', isEqualTo: 'student')
+                  .orderBy('points', descending: true)
+                  .limit(3)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('Failed to load leaderboard'),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text('No students ranked yet'),
+                    ),
+                  );
+                }
+
+                // Prepare data for podium (2nd, 1st, 3rd)
+                Map<String, dynamic>? first;
+                Map<String, dynamic>? second;
+                Map<String, dynamic>? third;
+
+                if (docs.isNotEmpty) {
+                  first = docs[0].data() as Map<String, dynamic>;
+                }
+                if (docs.length > 1) {
+                  second = docs[1].data() as Map<String, dynamic>;
+                }
+                if (docs.length > 2) {
+                  third = docs[2].data() as Map<String, dynamic>;
+                }
+
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.end, // Align bottom
+                  children: [
+                    // 2nd Place
+                    if (second != null)
+                      _buildPodiumItem(second, 2, const Color(0xFFC0C0C0)),
+
+                    // 1st Place (Center and Biggest)
+                    // 1st Place (Center and Biggest)
+                    if (first != null)
+                      _buildPodiumItem(
+                        first,
+                        1,
+                        const Color(0xFFFFD700),
+                        isCenter: true,
+                      )
+                    else
+                      const Center(child: Text("No Data")),
+
+                    // 3rd Place
+                    if (third != null)
+                      _buildPodiumItem(third, 3, const Color(0xFFCD7F32)),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPodiumItem(
+    Map<String, dynamic> data,
+    int rank,
+    Color color, {
+    bool isCenter = false,
+  }) {
+    final name = data['name'] ?? 'Unknown';
+    final points = data['points'] ?? 0;
+    final photo = data['profileImage'] as String?;
+    final size = isCenter ? 100.0 : 70.0; // Reduced Height (Was 120/90)
+    final avatarSize = isCenter ? 30.0 : 24.0; // Reduced Avatar (Was 36/28)
+
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Avatar with badge
+          Stack(
+            alignment: Alignment.topCenter,
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 2),
+                ),
+                child: CircleAvatar(
+                  radius: avatarSize,
+                  backgroundImage: (photo != null && photo.isNotEmpty)
+                      ? NetworkImage(photo)
+                      : null,
+                  child: (photo == null || photo.isEmpty)
+                      ? Text(
+                          name.isNotEmpty ? name[0] : '?',
+                          style: TextStyle(fontSize: avatarSize / 1.5),
+                        )
+                      : null,
+                ),
+              ),
+              if (isCenter)
+                Positioned(
+                  top: -24,
+                  child: Icon(Icons.workspace_premium, color: color, size: 32),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          Text(
+            name.split(' ').first, // Show First Name Only
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: isCenter ? 14 : 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            '$points pts',
+            style: TextStyle(
+              fontSize: isCenter ? 12 : 10,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Podium Stand
+          Container(
+            height: size,
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [color.withAlpha(150), color.withAlpha(50)],
+              ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(8),
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.white.withAlpha(200),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyTasksPlaceholder() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -533,166 +779,6 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
             'Create your first task to get started',
             style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniLeaderboardCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withAlpha(50)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(
-              Theme.of(context).brightness == Brightness.dark ? 50 : 10,
-            ),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withAlpha(30),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.leaderboard,
-                  color: Colors.purple,
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Top Students',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .where('role', isEqualTo: 'student')
-                  .orderBy('points', descending: true)
-                  .limit(3)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Icon(Icons.error, size: 16, color: Colors.grey),
-                  );
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  );
-                }
-                final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
-                  return const Center(
-                    child: Text('No Data', style: TextStyle(fontSize: 10)),
-                  );
-                }
-
-                return ListView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final name = data['name'] ?? 'Unknown';
-                    final points = data['points'] ?? 0;
-                    final photo = data['profileImage'] as String?;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          // Rank Circle
-                          Container(
-                            width: 16,
-                            height: 16,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: index == 0
-                                  ? Colors.amber
-                                  : (index == 1
-                                        ? Colors.grey
-                                        : Colors.brown[300]),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${index + 1}',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          // Avatar
-                          CircleAvatar(
-                            radius: 10,
-                            backgroundImage: (photo != null && photo.isNotEmpty)
-                                ? NetworkImage(photo)
-                                : null,
-                            child: (photo == null || photo.isEmpty)
-                                ? Text(
-                                    name.isNotEmpty ? name[0] : '?',
-                                    style: const TextStyle(fontSize: 8),
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 6),
-                          // Name
-                          Expanded(
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          // Points
-                          Text(
-                            '$points',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
           ),
         ],
       ),

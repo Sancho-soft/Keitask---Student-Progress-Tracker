@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart' as app_models;
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
+import 'package:keitask_management/models/task_model.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/storage_service.dart';
 import 'dart:io';
@@ -229,6 +230,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       context,
       listen: false,
     );
+    final authService = Provider.of<AuthService>(context, listen: false);
     // Simple approach: fetch users from Firestore 'users' collection for selection
     // We'll load users via a stream for the choice chips below.
 
@@ -329,7 +331,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
     // Create a single Task that contains the list of selected assignees
     List<String> assignees = [];
-    final authService = Provider.of<AuthService>(context, listen: false);
 
     if (adminCreate) {
       if (_assignToAll) {
@@ -382,7 +383,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       initialStatus = 'assigned';
     }
 
-    final newTask = app_models.Task(
+    final newTask = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),

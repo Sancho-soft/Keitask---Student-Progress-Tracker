@@ -1,6 +1,7 @@
 // lib/screens/auth/profile/profile_screen.dart (PREMIUM OVERHAUL)
 
 import 'package:flutter/material.dart';
+import 'package:keitask_management/models/task_model.dart';
 import '../../models/user_model.dart';
 import 'package:provider/provider.dart';
 import '../../services/auth_service.dart';
@@ -760,8 +761,30 @@ class ProfileScreen extends StatelessWidget {
                     controller: nameController,
                     decoration: InputDecoration(
                       labelText: 'Full Name',
+                      labelStyle: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF5F6F8),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -772,17 +795,35 @@ class ProfileScreen extends StatelessWidget {
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       labelText: 'Phone',
+                      labelStyle: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF5F6F8),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Colors.blue,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Address',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
+
                   PhilippineAddressSelector(
                     onAddressChanged: (address) {
                       addressController.text = address;
@@ -790,7 +831,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Divider(color: Colors.grey.withAlpha(50)),
-                  Container(
+                  SizedBox(
                     width: double.infinity,
                     child: TextButton.icon(
                       onPressed: () => _showDeleteAccountDialog(context),
@@ -1256,17 +1297,18 @@ class ProfileScreen extends StatelessWidget {
 
                   setState(() => isLoading = true);
                   try {
-                    // 1. Verify Password
-                    await Provider.of<AuthService>(
+                    final authService = Provider.of<AuthService>(
                       context,
                       listen: false,
-                    ).reauthenticate(passwordController.text.trim());
+                    );
+
+                    // 1. Verify Password
+                    await authService.reauthenticate(
+                      passwordController.text.trim(),
+                    );
 
                     // 2. Perform Delete
-                    await Provider.of<AuthService>(
-                      context,
-                      listen: false,
-                    ).deleteAccount();
+                    await authService.deleteAccount();
 
                     if (context.mounted) {
                       Navigator.pop(context); // Close Dialog

@@ -140,8 +140,27 @@ class _FullScreenImage extends StatelessWidget {
           child: Image.network(
             url,
             fit: BoxFit.contain,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                      : null,
+                  color: Colors.white,
+                ),
+              );
+            },
             errorBuilder: (_, __, ___) => const Center(
-              child: Text('Image Error', style: TextStyle(color: Colors.white)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.broken_image, color: Colors.white, size: 48),
+                  SizedBox(height: 16),
+                  Text('Image Error', style: TextStyle(color: Colors.white)),
+                ],
+              ),
             ),
           ),
         ),
