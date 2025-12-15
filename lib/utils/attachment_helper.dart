@@ -43,13 +43,28 @@ class AttachmentHelper {
           mode: LaunchMode.externalApplication,
         );
       } else {
+        if (!context.mounted) return;
         _showError(context, 'Could not open Google Docs Viewer');
       }
       return;
     }
 
-    // 2. PDF (Native Preview) - Fallback to System
-    /* ... disabled code ... */
+    // 2. PDF Handling
+    if (lowerUrl.endsWith('.pdf')) {
+      // Direct launch is often more reliable on mobile devices than Google Docs Viewer
+      // especially if the URL has authentication tokens or specific headers.
+      if (await canLaunchUrl(Uri.parse(cleanUrl))) {
+        await launchUrl(
+          Uri.parse(cleanUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        return;
+      }
+
+      if (!context.mounted) return;
+      _showError(context, 'Could not open PDF file.');
+      return;
+    }
 
     // 3. Images (Native Preview) - Keep original URL if it works, or clean?
     // Images usually work with params unless signed. Let's use cleanUrl.
@@ -71,6 +86,7 @@ class AttachmentHelper {
         mode: LaunchMode.externalApplication,
       );
     } else {
+      if (!context.mounted) return;
       _showError(context, 'Could not launch file');
     }
   }
@@ -95,6 +111,7 @@ class AttachmentHelper {
         mode: LaunchMode.externalApplication,
       );
     } else {
+      if (!context.mounted) return;
       _showError(context, 'Could not download file');
     }
   }

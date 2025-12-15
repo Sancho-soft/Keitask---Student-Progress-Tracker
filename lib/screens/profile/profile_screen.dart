@@ -10,6 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
 import '../../services/report_service.dart';
+import 'package:flutter/services.dart';
+import '../../widgets/philippine_address_selector.dart';
 
 // --- Custom Clipper for Curved Header ---
 class ProfileHeaderClipper extends CustomClipper<Path> {
@@ -766,6 +768,8 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   TextField(
                     controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       labelText: 'Phone',
                       border: OutlineInputBorder(
@@ -774,14 +778,15 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: addressController,
-                    decoration: InputDecoration(
-                      labelText: 'Address',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                  const Text(
+                    'Address',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  PhilippineAddressSelector(
+                    onAddressChanged: (address) {
+                      addressController.text = address;
+                    },
                   ),
                   const SizedBox(height: 24),
                   Divider(color: Colors.grey.withAlpha(50)),

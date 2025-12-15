@@ -272,6 +272,13 @@ class _SubmissionDetailsDialogState extends State<SubmissionDetailsDialog> {
       return;
     }
 
+    if (score < 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Score cannot be negative')));
+      return;
+    }
+
     if (score > 100) {
       ScaffoldMessenger.of(
         context,
