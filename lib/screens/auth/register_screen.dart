@@ -252,14 +252,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                const Text(
-                  'Address',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF666666),
-                  ),
-                ),
+                // Address
                 const SizedBox(height: 8),
                 PhilippineAddressSelector(
                   onAddressChanged: (address) {
@@ -273,7 +266,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 CustomTextField(
                   controller: _phoneController,
                   label: 'Phone Number',
-                  hint: 'Enter your phone number (digits only)',
+                  hint: 'Enter your phone number',
                   keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 16),

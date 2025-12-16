@@ -57,7 +57,16 @@ class _UsersScreenState extends State<UsersScreen> {
           initialAssignees: _selectedUserIds.toList(),
         ),
       ),
-    ).then((_) {
+    ).then((result) {
+      if (result == true) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Task assigned into team/student successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
       // Clear selection after returning
       setState(() {
         _selectedUserIds.clear();

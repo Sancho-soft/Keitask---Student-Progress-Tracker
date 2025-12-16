@@ -36,3 +36,56 @@ exports.onTaskStatusChange = functions.firestore
 
     return null;
   });
+
+// Trigger: send a push notification when a new document is created in the 'notifications' collection
+exports.sendPushNotification = functions.firestore
+  .document('notifications/{notificationId}')
+  .onCreate(async (snapshot, context) => {
+    const notification = snapshot.data();
+    const recipientId = notification.recipientId;
+
+    if (!recipientId) {
+      console.log('No recipientId found for notification:', context.params.notificationId);
+      return null;
+    }
+
+    try {
+      // 1. Get the user's FCM token from Firestore
+      const userDoc = await admin.firestore().collection('users').doc(recipientId).get();
+      if (!userDoc.exists) {
+        console.log(`User ${recipientId} not found`);
+        return null;
+      }
+
+      const userData = userDoc.data();
+      const fcmToken = userData.fcmToken;
+
+      if (!fcmToken) {
+        console.log(`No FCM token for user ${recipientId}`);
+        return null;
+      }
+
+      // 2. Construct the message payload
+      const payload = {
+        notification: {
+          title: notification.title || 'New Notification',
+          body: notification.body || '',
+        },
+        data: {
+          // Add any additional data here
+          id: context.params.notificationId,
+          type: notification.type || 'general',
+          relatedId: notification.relatedId || '',
+        },
+        token: fcmToken,
+      };
+
+      // 3. Send the message
+      const response = await admin.messaging().send(payload);
+      console.log('Successfully sent message:', response);
+    } catch (error) {
+      console.error('Error sending push notification:', error);
+    }
+
+    return null;
+  });

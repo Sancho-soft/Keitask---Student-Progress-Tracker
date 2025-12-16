@@ -389,14 +389,8 @@ class ProfileScreen extends StatelessWidget {
           }
           // PROFESSOR / ADMIN VIEW: Tasks Created
           else {
-            int created = tasks
-                .where((t) => t.creator == displayUser.id)
-                .length;
-            return Row(
-              mainAxisAlignment:
-                  MainAxisAlignment.center, // Single item centered
-              children: [_buildStatItem(context, '$created', 'Tasks Created')],
-            );
+            // Request: remove "Tasks Created" for admin profile page
+            return const SizedBox.shrink();
           }
         },
       ),
@@ -1066,7 +1060,6 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _showNotificationSettingsDialog(BuildContext context) {
-    bool emailNotifications = true;
     bool pushNotifications = true;
 
     showDialog(
@@ -1080,12 +1073,6 @@ class ProfileScreen extends StatelessWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SwitchListTile(
-                title: const Text('Email Notifications'),
-                subtitle: const Text('Receive updates via email'),
-                value: emailNotifications,
-                onChanged: (val) => setState(() => emailNotifications = val),
-              ),
               SwitchListTile(
                 title: const Text('Push Notifications'),
                 subtitle: const Text('Receive alerts on your device'),

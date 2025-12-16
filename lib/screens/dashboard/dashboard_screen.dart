@@ -127,7 +127,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final role = widget.user.role.toLowerCase();
     if (role == 'professor' && index == 2) {
       // "New Task" action - Navigate to CreateTaskScreen
-      Navigator.pushNamed(context, '/create-task', arguments: widget.user);
+      Navigator.pushNamed(context, '/create-task', arguments: widget.user).then(
+        (result) {
+          if (result == true && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Task created successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
+      );
       return; // Do not update _currentIndex
     }
 

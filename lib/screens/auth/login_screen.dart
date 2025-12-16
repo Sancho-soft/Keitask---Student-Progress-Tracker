@@ -126,12 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 // Removed MainAxisAlignment.center to allow manual spacing from top
                 children: [
-                  const SizedBox(
-                    height: 200,
-                  ), // Added spacing to move logo down
                   // Logo Section - Using Image Asset
                   _buildLogo(),
-                  const SizedBox(height: 1),
+                  const SizedBox(height: 24),
 
                   Align(
                     alignment: Alignment.centerLeft,
@@ -305,8 +302,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildLogo() {
     return Image.asset(
       'assets/images/icons/logo_keitask.png',
-      width: 250,
-      height: 250,
+      width: 300,
+      height: 300,
       fit: BoxFit.contain,
       errorBuilder: (context, error, stackTrace) {
         return const Icon(Icons.task, size: 100, color: Colors.teal);

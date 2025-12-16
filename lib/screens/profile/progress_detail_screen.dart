@@ -370,7 +370,7 @@ class ProgressDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        s.isEmpty ? 'unknown' : s,
+        s.isEmpty ? 'UNKNOWN' : s.toUpperCase(),
         style: TextStyle(color: text, fontWeight: FontWeight.w600),
       ),
     );

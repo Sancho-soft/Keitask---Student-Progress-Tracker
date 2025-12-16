@@ -66,6 +66,23 @@ class FirestoreTaskService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateTaskDetails(
+    String taskId,
+    String? title,
+    String? description,
+    DateTime? dueDate,
+  ) async {
+    final updates = <String, dynamic>{};
+    if (title != null) updates['title'] = title;
+    if (description != null) updates['description'] = description;
+    if (dueDate != null) updates['dueDate'] = dueDate.toIso8601String();
+
+    if (updates.isNotEmpty) {
+      await _tasksRef.doc(taskId).update(updates);
+      notifyListeners();
+    }
+  }
+
   Future<void> rejectTask(String taskId, String reason) async {
     await _tasksRef.doc(taskId).update({
       'status': 'rejected',

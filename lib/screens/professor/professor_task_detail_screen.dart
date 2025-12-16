@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:flutter/cupertino.dart';
 import 'package:keitask_management/models/task_model.dart';
 import '../../models/user_model.dart';
 import '../../models/grade_model.dart';
@@ -50,7 +51,21 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
         }
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Task Details'), elevation: 0),
+          appBar: AppBar(
+            title: const Text('Task Details'),
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const CircleAvatar(
+                  backgroundColor: Colors.blue,
+                  radius: 16,
+                  child: Icon(Icons.edit, color: Colors.white, size: 18),
+                ),
+                onPressed: () => _showEditTaskDialog(context, _currentTask),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
           body: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,6 +317,16 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
       feedbackController.text = g.comment ?? '';
     }
 
+    final submissionTime = task.completionStatus?[studentId];
+    String? formattedSubmissionTime;
+    if (submissionTime != null) {
+      final dt = DateTime.tryParse(submissionTime as String);
+      if (dt != null) {
+        formattedSubmissionTime =
+            '${dt.day}/${dt.month}/${dt.year} ${dt.hour > 12 ? dt.hour - 12 : dt.hour}:${dt.minute.toString().padLeft(2, '0')} ${dt.hour >= 12 ? 'PM' : 'AM'}';
+      }
+    }
+
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -318,6 +343,13 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                     'Attachments:',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
+                  if (formattedSubmissionTime != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Submitted on: \$formattedSubmissionTime',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   const SizedBox(height: 8),
                   if (files.isEmpty)
@@ -603,5 +635,224 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _showEditTaskDialog(BuildContext context, Task task) {
+    final titleController = TextEditingController(text: task.title);
+    final descController = TextEditingController(text: task.description);
+    DateTime selectedDate = task.dueDate;
+    TimeOfDay selectedTime = TimeOfDay.fromDateTime(task.dueDate);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Edit Task Details'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(labelText: 'Title'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: descController,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ListTile(
+                        title: const Text('Due Date'),
+                        subtitle: Text(
+                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        ),
+                        trailing: const Icon(Icons.calendar_today),
+                        onTap: () async {
+                          await showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.white,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20),
+                              ),
+                            ),
+                            builder: (BuildContext builder) {
+                              return SizedBox(
+                                height: 300,
+                                child: Column(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Select Date',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('Done'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Divider(height: 1),
+                                    Expanded(
+                                      child: CupertinoDatePicker(
+                                        mode: CupertinoDatePickerMode.date,
+                                        initialDateTime: selectedDate,
+                                        minimumDate: DateTime.now(),
+                                        maximumDate: DateTime(2100),
+                                        onDateTimeChanged: (DateTime newDate) {
+                                          setState(
+                                            () => selectedDate = newDate,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                      ListTile(
+                        title: const Text('Due Time'),
+                        subtitle: Text(selectedTime.format(context)),
+                        trailing: const Icon(Icons.access_time),
+                        onTap: () async {
+                          await showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.white,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20),
+                              ),
+                            ),
+                            builder: (BuildContext builder) {
+                              return SizedBox(
+                                height: 300,
+                                child: Column(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Select Time',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context),
+                                            child: const Text('Done'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Divider(height: 1),
+                                    Expanded(
+                                      child: CupertinoDatePicker(
+                                        mode: CupertinoDatePickerMode.time,
+                                        initialDateTime: DateTime(
+                                          selectedDate.year,
+                                          selectedDate.month,
+                                          selectedDate.day,
+                                          selectedTime.hour,
+                                          selectedTime.minute,
+                                        ),
+                                        use24hFormat: false,
+                                        onDateTimeChanged: (DateTime newDate) {
+                                          setState(
+                                            () => selectedTime =
+                                                TimeOfDay.fromDateTime(newDate),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (titleController.text.trim().isEmpty) return;
+
+                    final newDateTime = DateTime(
+                      selectedDate.year,
+                      selectedDate.month,
+                      selectedDate.day,
+                      selectedTime.hour,
+                      selectedTime.minute,
+                    );
+
+                    await Provider.of<FirestoreTaskService>(
+                      context,
+                      listen: false,
+                    ).updateTaskDetails(
+                      task.id,
+                      titleController.text.trim(),
+                      descController.text.trim(),
+                      newDateTime,
+                    );
+
+                    if (context.mounted) {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Task updated successfully'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
