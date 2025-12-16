@@ -6,7 +6,6 @@ import '../../services/auth_service.dart';
 import '../../models/user_model.dart';
 import '../../services/firestore_task_service.dart';
 import 'package:keitask_management/widgets/circular_nav_bar.dart';
-
 import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard.dart';
 import '../professor/professor_dashboard.dart';
@@ -128,7 +127,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final role = widget.user.role.toLowerCase();
     if (role == 'professor' && index == 2) {
       // "New Task" action - Navigate to CreateTaskScreen
-      Navigator.pushNamed(context, '/create-task', arguments: widget.user);
+      Navigator.pushNamed(context, '/create-task', arguments: widget.user).then(
+        (result) {
+          if (result == true && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Task created successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        },
+      );
       return; // Do not update _currentIndex
     }
 
@@ -177,6 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ProfessorDashboard(
           user: widget.user,
           onSeeAllTasks: () => _onTabSelected(1), // Switch to Tasks tab
+          onGoToLeaderboard: () => _onTabSelected(3), // Switch to Rank tab
         ),
         ProfessorTasksScreen(
           user: widget.user,

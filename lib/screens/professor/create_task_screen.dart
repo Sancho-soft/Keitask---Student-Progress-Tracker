@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_model.dart' as app_models;
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
+import 'package:keitask_management/models/task_model.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../services/storage_service.dart';
 import 'dart:io';
@@ -65,27 +66,74 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
   Future<void> _selectDate(BuildContext context) async {
     final now = DateTime.now();
-    // Allow today by resetting time to midnight for the start range
     final firstDate = DateTime(now.year, now.month, now.day);
 
-    final DateTime? picked = await showDatePicker(
+    // Use a temp variable to track changes as the wheel scrolls
+    DateTime tempPickedDate = _selectedDate.isBefore(firstDate)
+        ? firstDate
+        : _selectedDate;
+
+    await showModalBottomSheet(
       context: context,
-      initialDate: _selectedDate.isBefore(firstDate)
-          ? firstDate
-          : _selectedDate,
-      firstDate: firstDate,
-      lastDate: DateTime(2030), // Extended range
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext builder) {
+        return SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Date',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Done', style: TextStyle(fontSize: 16)),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Picker
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.date,
+                  initialDateTime: tempPickedDate,
+                  minimumDate: firstDate,
+                  maximumDate: DateTime(2030),
+                  onDateTimeChanged: (DateTime newDate) {
+                    tempPickedDate = newDate;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
 
-    if (picked != null && picked != _selectedDate) {
-      setState(() => _selectedDate = picked);
+    // Apply the selection on dismiss/done
+    if (tempPickedDate != _selectedDate) {
+      setState(() => _selectedDate = tempPickedDate);
 
-      // Post-check: If they switched to Today, and the current _selectedTime is already passed,
-      // warn them or let the _createTask validation handle it?
-      // Better UX: check immediately.
-      if (picked.year == now.year &&
-          picked.month == now.month &&
-          picked.day == now.day) {
+      // Post-check: If they switched to Today, and the current _selectedTime is already passed
+      if (tempPickedDate.year == now.year &&
+          tempPickedDate.month == now.month &&
+          tempPickedDate.day == now.day) {
         final currentMinutes = now.hour * 60 + now.minute;
         final selectedMinutes = _selectedTime.hour * 60 + _selectedTime.minute;
         if (selectedMinutes <= currentMinutes) {
@@ -93,8 +141,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
             'Note: Selected time is in the past. Please update time.',
             Colors.orange,
           );
-          // Optional: Auto-bump time?
-          // setState(() => _selectedTime = TimeOfDay.fromDateTime(now.add(Duration(minutes: 5))));
         }
       }
     }
@@ -176,17 +222,37 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
 
     // VALIDATION LOGIC after selection is confirmed (sheet closed)
     final now = DateTime.now();
-    if (tempPickedDateTime.isBefore(now)) {
-      _showSnackBar(
-        'Please select a future time. Selection Reset.',
-        Colors.red,
-      );
-      // We do not update _selectedTime, essentially filtering the invalid input
-    } else {
-      setState(() {
-        _selectedTime = TimeOfDay.fromDateTime(tempPickedDateTime);
-      });
+    // Truncate seconds for comparison to allow selecting "now" (minute-wise)
+    final truncatedNow = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
+
+    // Check if the picked time (combined with selected date) is before the current minute
+    // Logic: if selectedDate is today, check time.
+    if (_selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day) {
+      if (tempPickedDateTime.isBefore(truncatedNow)) {
+        _showSnackBar(
+          'Please select a future time. Selection Reset.',
+          Colors.red,
+        );
+        // We do not update _selectedTime
+        return;
+      }
     }
+    // If date is in past (shouldn't be possible with date picker)
+    if (tempPickedDateTime.isBefore(truncatedNow)) {
+      // Fallback safety
+    }
+
+    setState(() {
+      _selectedTime = TimeOfDay.fromDateTime(tempPickedDateTime);
+    });
   }
 
   // --- File Picker Logic ---
@@ -205,6 +271,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
           'xls',
           'xlsx',
           'txt',
+          'zip', // Added zip
         ],
       );
 
@@ -229,6 +296,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       context,
       listen: false,
     );
+    final authService = Provider.of<AuthService>(context, listen: false);
     // Simple approach: fetch users from Firestore 'users' collection for selection
     // We'll load users via a stream for the choice chips below.
 
@@ -280,13 +348,14 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       // Generate a temporary ID if we want, or just use a timestamp for folder
       final now = DateTime.now();
       final tempTaskId = now.millisecondsSinceEpoch.toString();
-      final folderPath = 'tasks/${now.year}/$tempTaskId';
+      final folderPath = 'keitaskfolder/tasks/${now.year}/$tempTaskId';
 
       for (var file in _pickedFiles) {
         if (file.path != null) {
           final url = await storageService.uploadFile(
             File(file.path!),
             folder: folderPath, // Organized by year and task
+            resourceType: 'auto',
           );
           if (url != null) {
             // Append original file name for display purposes
@@ -311,25 +380,35 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       _selectedTime.minute,
     );
 
+    // MOVED VALIDATION UP BEFORE UPLOAD OR CREATION
+    final now = DateTime.now();
+    // Allow current minute by ignoring seconds/milli
+    final truncatedNow = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    );
+
+    // Strict Validation: Must be in the future (greater than current minute)
+    if (!dueDateTime.isAfter(truncatedNow)) {
+      _showSnackBar('Due time must be in the future', Colors.red);
+      setState(() => _isCreating = false);
+      return;
+    }
+
     int failedCount = _pickedFiles.length - attachmentUrls.length;
     if (failedCount > 0) {
       _showSnackBar(
         '$failedCount file(s) failed to upload. Task created with ${attachmentUrls.length} attachments.',
         Colors.orange,
       );
-    } else {
-      _showSnackBar('Task created successfully', Colors.green);
     }
-
-    if (dueDateTime.isBefore(DateTime.now())) {
-      _showSnackBar('Due time must be in the future', Colors.red);
-      setState(() => _isCreating = false);
-      return;
-    }
+    // Removed premature success message here
 
     // Create a single Task that contains the list of selected assignees
     List<String> assignees = [];
-    final authService = Provider.of<AuthService>(context, listen: false);
 
     if (adminCreate) {
       if (_assignToAll) {
@@ -382,7 +461,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       initialStatus = 'assigned';
     }
 
-    final newTask = app_models.Task(
+    final newTask = Task(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
@@ -400,7 +479,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     setState(() => _isCreating = false);
     // Success message moved up to handle partial failures logic
     // _showSnackBar('Task created successfully', Colors.green);
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
   void _showSnackBar(String message, Color color) {
@@ -986,9 +1065,11 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     required String hint,
     int maxLines = 1,
     bool isGrayBackground = false,
+    TextCapitalization textCapitalization = TextCapitalization.sentences,
   }) {
     return TextField(
       controller: controller,
+      textCapitalization: textCapitalization,
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,

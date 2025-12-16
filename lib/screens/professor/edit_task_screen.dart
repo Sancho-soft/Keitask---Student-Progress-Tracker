@@ -1,7 +1,7 @@
 // keitask_management/lib/screens/auth/tasks/edit_task_screen.dart (MODIFIED TO BE A DEDICATED EDIT FORM)
 
 import 'package:flutter/material.dart';
-import '../../models/user_model.dart';
+import 'package:keitask_management/models/task_model.dart';
 
 class EditTaskScreen extends StatefulWidget {
   final Task task;

@@ -7,13 +7,15 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/splash_screen.dart';
+import 'screens/common/splash_screen.dart';
+import 'screens/common/approval_pending_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart'; // Ensure this path is correct
 import 'screens/auth/register_screen.dart'; // Ensure this path is correct
 import 'screens/professor/create_task_screen.dart';
 import 'screens/student/student_tasks_screen.dart';
 import 'screens/admin/users_screen.dart';
+import 'screens/leaderboard/leaderboard_screen.dart';
 import 'services/task_service.dart'; // NEW IMPORT
 import 'models/user_model.dart'; // For type checking in routes
 import 'services/auth_service.dart';
@@ -250,6 +252,8 @@ class MyApp extends StatelessWidget {
         '/admin/users': (context) {
           return const UsersScreen();
         },
+        '/approval_pending': (context) => const ApprovalPendingScreen(),
+        '/leaderboard': (context) => const LeaderboardScreen(),
       },
       builder: (context, child) {
         final theme = Provider.of<ThemeService>(context);

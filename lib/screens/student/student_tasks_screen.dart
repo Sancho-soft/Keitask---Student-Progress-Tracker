@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'submission_details_dialog.dart';
 import '../../models/user_model.dart';
+import 'package:keitask_management/models/task_model.dart';
 import '../../services/firestore_task_service.dart';
 import '../../services/auth_service.dart';
 
@@ -667,7 +668,9 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                                   child: Container(
                                     padding: const EdgeInsets.all(4),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.8),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.8,
+                                      ),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
@@ -870,7 +873,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                       }
                     } else {
                       // Student View
-                      List<String>? myUrls;
+                      List<dynamic>? myUrls;
 
                       // 1. Try Direct ID Match
                       if (safeUser != null && task.submissions != null) {
@@ -1061,13 +1064,15 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
                                 );
                               } catch (e) {
                                 debugPrint('Bookmark error: $e');
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Failed to bookmark: $e'),
-                                    behavior: SnackBarBehavior.floating,
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to bookmark: $e'),
+                                      behavior: SnackBarBehavior.floating,
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               }
                             },
                           ),

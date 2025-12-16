@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/firestore_task_service.dart';
-import '../../../models/user_model.dart';
+import 'package:keitask_management/models/task_model.dart';
 
 /// Progress detail screen: shows approved/pending/rejected/resubmitted counts
 /// for the current user, a progress overview and a list of recent tasks.
@@ -370,7 +370,7 @@ class ProgressDetailScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        s.isEmpty ? 'unknown' : s,
+        s.isEmpty ? 'UNKNOWN' : s.toUpperCase(),
         style: TextStyle(color: text, fontWeight: FontWeight.w600),
       ),
     );

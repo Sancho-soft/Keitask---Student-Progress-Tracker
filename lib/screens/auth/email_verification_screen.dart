@@ -149,7 +149,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
           children: [
             // Lottie Animation
             Lottie.asset(
-              'lib/assets/animations/verify_email_animation.json',
+              'assets/animations/verify_email_animation.json',
               height: 200,
               repeat: true,
             ),

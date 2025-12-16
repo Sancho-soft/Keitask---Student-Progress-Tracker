@@ -51,11 +51,21 @@ class AttachmentHelper {
 
     // 2. PDF Handling
     if (lowerUrl.endsWith('.pdf')) {
-      // Direct launch is often more reliable on mobile devices than Google Docs Viewer
-      // especially if the URL has authentication tokens or specific headers.
+      // Direct launch first
       if (await canLaunchUrl(Uri.parse(cleanUrl))) {
-        await launchUrl(
+        final launched = await launchUrl(
           Uri.parse(cleanUrl),
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched) return;
+      }
+
+      // Fallback: Google Docs Viewer
+      final googleDocsUrl =
+          'https://docs.google.com/viewer?url=${Uri.encodeComponent(cleanUrl)}';
+      if (await canLaunchUrl(Uri.parse(googleDocsUrl))) {
+        await launchUrl(
+          Uri.parse(googleDocsUrl),
           mode: LaunchMode.externalApplication,
         );
         return;
@@ -140,8 +150,27 @@ class _FullScreenImage extends StatelessWidget {
           child: Image.network(
             url,
             fit: BoxFit.contain,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Center(
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded /
+                            loadingProgress.expectedTotalBytes!
+                      : null,
+                  color: Colors.white,
+                ),
+              );
+            },
             errorBuilder: (_, __, ___) => const Center(
-              child: Text('Image Error', style: TextStyle(color: Colors.white)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.broken_image, color: Colors.white, size: 48),
+                  SizedBox(height: 16),
+                  Text('Image Error', style: TextStyle(color: Colors.white)),
+                ],
+              ),
             ),
           ),
         ),

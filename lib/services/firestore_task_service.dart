@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../models/user_model.dart' as app_models;
+import 'package:keitask_management/models/task_model.dart';
 import '../models/grade_model.dart' as app_models;
 
 class FirestoreTaskService extends ChangeNotifier {
@@ -16,29 +16,29 @@ class FirestoreTaskService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Stream<List<app_models.Task>> tasksStream() {
+  Stream<List<Task>> tasksStream() {
     return _tasksRef.snapshots().map(
       (snap) => snap.docs.map((d) {
         final data = d.data() as Map<String, dynamic>;
         // ensure the document id is available to the model
         final merged = Map<String, dynamic>.from(data);
         merged['id'] = d.id;
-        return app_models.Task.fromJson(merged);
+        return Task.fromJson(merged);
       }).toList(),
     );
   }
 
-  Future<List<app_models.Task>> getAllTasks() async {
+  Future<List<Task>> getAllTasks() async {
     final snap = await _tasksRef.get();
     return snap.docs.map((d) {
       final data = d.data() as Map<String, dynamic>;
       final merged = Map<String, dynamic>.from(data);
       merged['id'] = d.id;
-      return app_models.Task.fromJson(merged);
+      return Task.fromJson(merged);
     }).toList();
   }
 
-  Future<void> createTask(app_models.Task task) async {
+  Future<void> createTask(Task task) async {
     // Persist all task fields including courseId, grades, etc.
     await _tasksRef.doc(task.id).set(task.toJson());
 
@@ -64,6 +64,23 @@ class FirestoreTaskService extends ChangeNotifier {
   Future<void> updateTaskStatus(String taskId, String newStatus) async {
     await _tasksRef.doc(taskId).update({'status': newStatus});
     notifyListeners();
+  }
+
+  Future<void> updateTaskDetails(
+    String taskId,
+    String? title,
+    String? description,
+    DateTime? dueDate,
+  ) async {
+    final updates = <String, dynamic>{};
+    if (title != null) updates['title'] = title;
+    if (description != null) updates['description'] = description;
+    if (dueDate != null) updates['dueDate'] = dueDate.toIso8601String();
+
+    if (updates.isNotEmpty) {
+      await _tasksRef.doc(taskId).update(updates);
+      notifyListeners();
+    }
   }
 
   Future<void> rejectTask(String taskId, String reason) async {
@@ -168,7 +185,7 @@ class FirestoreTaskService extends ChangeNotifier {
   Future<void> submitTask(
     String taskId,
     String userId,
-    List<String> fileUrls, {
+    List<dynamic> files, {
     String? notes,
   }) async {
     final taskRef = _tasksRef.doc(taskId);
@@ -179,7 +196,7 @@ class FirestoreTaskService extends ChangeNotifier {
     final currentSubmissions = Map<String, dynamic>.from(
       taskData['submissions'] ?? {},
     );
-    currentSubmissions[userId] = fileUrls;
+    currentSubmissions[userId] = files;
 
     final currentSubmissionNotes = Map<String, dynamic>.from(
       taskData['submissionNotes'] ?? {},

@@ -128,29 +128,36 @@ class _PhilippineAddressSelectorState extends State<PhilippineAddressSelector> {
     required Function(String?) onChanged,
   }) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade400),
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.grey.shade100,
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
+            filled: true,
+            fillColor: const Color(0xFFF5F6F8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4, // Reduced vertical padding for dropdown
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.blue, width: 1.5),
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
               hint: Text('Select $label'),
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
               items: items.map((item) {
                 return DropdownMenuItem<String>(
                   value: item['code'],
@@ -164,7 +171,7 @@ class _PhilippineAddressSelectorState extends State<PhilippineAddressSelector> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -178,7 +185,7 @@ class _PhilippineAddressSelectorState extends State<PhilippineAddressSelector> {
 
         // Region
         _buildDropdown(
-          label: 'Region',
+          label: 'Address/Region',
           value: selectedRegionCode,
           items: regions,
           onChanged: (val) {

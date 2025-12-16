@@ -10,6 +10,7 @@ class StorageService {
     File file, {
     void Function(double progress)? onProgress,
     String? folder,
+    String? resourceType, // 'auto', 'image', 'video', 'raw'
   }) async {
     // Try Cloudinary upload first. Configure these values accordingly.
     const envCloudName = String.fromEnvironment(
@@ -35,7 +36,7 @@ class StorageService {
         !uploadPreset.startsWith('PUT_')) {
       try {
         final uri = Uri.parse(
-          'https://api.cloudinary.com/v1_1/$cloudName/auto/upload', // 'auto' for any file type
+          'https://api.cloudinary.com/v1_1/$cloudName/${resourceType ?? 'auto'}/upload',
         );
 
         final totalBytes = await file.length();

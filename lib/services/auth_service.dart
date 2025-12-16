@@ -83,6 +83,20 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  // Explicitly update FCM token (public helper)
+  Future<void> updateFcmToken(String? token) async {
+    if (token == null) return;
+    if (firebaseUser != null) {
+      try {
+        await _firestore.collection('users').doc(firebaseUser!.uid).update({
+          'fcmToken': token,
+        });
+      } catch (_) {
+        // failed to update token
+      }
+    }
+  }
+
   Future<void> _loadAppUser(String uid) async {
     _loadingUid = uid;
     try {
@@ -294,6 +308,11 @@ class AuthService extends ChangeNotifier {
     final uid = cred.user!.uid;
     try {
       await _loadAppUser(uid);
+      // Ensure token is saved on explicit sign in
+      try {
+        final token = await FirebaseMessaging.instance.getToken();
+        await updateFcmToken(token);
+      } catch (_) {}
     } catch (e) {
       // If _loadAppUser throws (due to ban/approval), rethrow to UI
       rethrow;
@@ -370,11 +389,20 @@ class AuthService extends ChangeNotifier {
           isApproved: true,
           isBanned: false,
           address: null,
+          createdAt: fbUser.metadata.creationTime,
         );
-        await _firestore.collection('users').doc(uid).set(newUser.toJson());
+        final userData = newUser.toJson();
+        userData['createdAt'] = userData['createdAt'] != null
+            ? Timestamp.fromDate(userData['createdAt'])
+            : FieldValue.serverTimestamp();
+        await _firestore.collection('users').doc(uid).set(userData);
       }
 
       await _loadAppUser(uid);
+      try {
+        final token = await FirebaseMessaging.instance.getToken();
+        await updateFcmToken(token);
+      } catch (_) {}
       notifyListeners();
       return appUser;
     } catch (e) {
