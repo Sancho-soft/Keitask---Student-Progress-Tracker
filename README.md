@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # keitask_management
 
 Keitask a studnet progress tracker is at alpha stage!
