@@ -320,11 +320,10 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
     final submissionTime = task.completionStatus?[studentId];
     String? formattedSubmissionTime;
     if (submissionTime != null) {
-      final dt = DateTime.tryParse(submissionTime as String);
-      if (dt != null) {
-        formattedSubmissionTime =
-            '${dt.day}/${dt.month}/${dt.year} ${dt.hour > 12 ? dt.hour - 12 : dt.hour}:${dt.minute.toString().padLeft(2, '0')} ${dt.hour >= 12 ? 'PM' : 'AM'}';
-      }
+      final dt = submissionTime;
+
+      formattedSubmissionTime =
+          '${dt.day}/${dt.month}/${dt.year} ${dt.hour > 12 ? dt.hour - 12 : dt.hour}:${dt.minute.toString().padLeft(2, '0')} ${dt.hour >= 12 ? 'PM' : 'AM'}';
     }
 
     showDialog(
