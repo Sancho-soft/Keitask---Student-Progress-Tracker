@@ -562,10 +562,10 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                _buildLabel('Description'),
+                _buildLabel('Instructions'),
                 _buildTextField(
                   controller: _descriptionController,
-                  hint: 'Enter task details...',
+                  hint: 'Enter task instructions...',
                   maxLines: 5,
                   isGrayBackground: false,
                 ),

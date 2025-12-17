@@ -587,70 +587,122 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
             },
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .where('role', isEqualTo: 'student')
-                  .orderBy('points', descending: true)
-                  .limit(3)
+                  .collection('tasks')
+                  .where('creator', isEqualTo: widget.user.id)
                   .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+              builder: (context, taskSnapshot) {
+                if (taskSnapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (snapshot.hasError) {
+                if (taskSnapshot.hasError) {
                   return const Center(
                     child: Text('Failed to load leaderboard'),
                   );
                 }
 
-                final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
+                // Extract student IDs
+                final tasks = taskSnapshot.data?.docs ?? [];
+                final Set<String> studentIds = {};
+                for (var doc in tasks) {
+                  try {
+                    final data = doc.data() as Map<String, dynamic>;
+                    List<String> taskAssignees = [];
+                    if (data['assignees'] is List) {
+                      taskAssignees = List<String>.from(
+                        (data['assignees'] as List).map((e) => e.toString()),
+                      );
+                    } else if (data['assignee'] != null) {
+                      taskAssignees = [data['assignee'].toString()];
+                    }
+                    studentIds.addAll(taskAssignees);
+                  } catch (e) {
+                    // ignore error
+                  }
+                }
+
+                if (studentIds.isEmpty) {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text('No students ranked yet'),
+                      child: Text('No students assigned yet'),
                     ),
                   );
                 }
 
-                // Prepare data for podium (2nd, 1st, 3rd)
-                Map<String, dynamic>? first;
-                Map<String, dynamic>? second;
-                Map<String, dynamic>? third;
+                // Fetch Users filtered by IDs
+                // Note: Firestore 'whereIn' is limited to 10. For scalability in this dashboard widget,
+                // we'll fetch all students and filter client side, or limit to top X in a real app.
+                // Reusing the robust pattern from ProfessorLeaderboard.
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .snapshots(),
+                  builder: (context, userSnapshot) {
+                    if (!userSnapshot.hasData)
+                      return const Center(child: CircularProgressIndicator());
 
-                if (docs.isNotEmpty) {
-                  first = docs[0].data() as Map<String, dynamic>;
-                }
-                if (docs.length > 1) {
-                  second = docs[1].data() as Map<String, dynamic>;
-                }
-                if (docs.length > 2) {
-                  third = docs[2].data() as Map<String, dynamic>;
-                }
+                    final allDocs = userSnapshot.data!.docs;
+                    final myStudents = allDocs
+                        .where((doc) => studentIds.contains(doc.id))
+                        .toList();
 
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.end, // Align bottom
-                  children: [
-                    // 2nd Place
-                    if (second != null)
-                      _buildPodiumItem(second, 2, const Color(0xFFC0C0C0)),
+                    // Sort by points
+                    myStudents.sort((a, b) {
+                      final pA =
+                          (a.data() as Map<String, dynamic>)['points'] ?? 0;
+                      final pB =
+                          (b.data() as Map<String, dynamic>)['points'] ?? 0;
+                      return pB.compareTo(pA);
+                    });
 
-                    // 1st Place (Center and Biggest)
-                    // 1st Place (Center and Biggest)
-                    if (first != null)
-                      _buildPodiumItem(
-                        first,
-                        1,
-                        const Color(0xFFFFD700),
-                        isCenter: true,
-                      )
-                    else
-                      const Center(child: Text("No Data")),
+                    final top3 = myStudents.take(3).toList();
 
-                    // 3rd Place
-                    if (third != null)
-                      _buildPodiumItem(third, 3, const Color(0xFFCD7F32)),
-                  ],
+                    if (top3.isEmpty) {
+                      return const Center(child: Text('No students found'));
+                    }
+
+                    // Prepare data for podium (2nd, 1st, 3rd)
+                    Map<String, dynamic>? first;
+                    Map<String, dynamic>? second;
+                    Map<String, dynamic>? third;
+
+                    if (top3.isNotEmpty) {
+                      first = top3[0].data() as Map<String, dynamic>;
+                    }
+                    if (top3.length > 1) {
+                      second = top3[1].data() as Map<String, dynamic>;
+                    }
+                    if (top3.length > 2) {
+                      third = top3[2].data() as Map<String, dynamic>;
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.end, // Align bottom
+                      children: [
+                        // 2nd Place
+                        if (second != null)
+                          _buildPodiumItem(second, 2, const Color(0xFFC0C0C0)),
+
+                        // 1st Place (Center and Biggest)
+                        if (first != null)
+                          _buildPodiumItem(
+                            first,
+                            1,
+                            const Color(0xFFFFD700),
+                            isCenter: true,
+                          )
+                        else
+                          // Should not happen if list not empty
+                          const Center(child: Text("No Data")),
+
+                        // 3rd Place
+                        if (third != null)
+                          _buildPodiumItem(third, 3, const Color(0xFFCD7F32)),
+                      ],
+                    );
+                  },
                 );
               },
             ),

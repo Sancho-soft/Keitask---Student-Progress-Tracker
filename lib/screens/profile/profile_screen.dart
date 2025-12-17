@@ -309,12 +309,13 @@ class ProfileScreen extends StatelessWidget {
                         onTap: () => _showSystemPreferencesDialog(context),
                       ),
                       const SizedBox(height: 12),
-                      _buildSettingItem(
-                        context,
-                        icon: Icons.bug_report_outlined,
-                        label: 'Report a Problem',
-                        onTap: () => _showReportDialog(context),
-                      ),
+                      if (displayUser.role.toLowerCase() != 'admin')
+                        _buildSettingItem(
+                          context,
+                          icon: Icons.bug_report_outlined,
+                          label: 'Report a Problem',
+                          onTap: () => _showReportDialog(context),
+                        ),
                       const SizedBox(height: 12),
                       _buildSettingItem(
                         context,

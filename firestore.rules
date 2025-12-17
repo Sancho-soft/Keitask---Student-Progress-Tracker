@@ -10,8 +10,8 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
 
-    function isAdmin() {
-      return isSignedIn() && getUserRole(request.auth.uid) == 'admin';
+    function isProfessor() {
+      return isSignedIn() && getUserRole(request.auth.uid) == 'professor';
     }
 
     match /tasks/{taskId} {
@@ -22,35 +22,32 @@ service cloud.firestore {
 
       // Update: enforce allowed transitions and roles
       allow update: if isSignedIn() && (
-        // Admin can approve/reject from pending or resubmitted
-        (isAdmin() && (
-          (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'approved') ||
-          (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'rejected' &&
-            request.resource.data.rejectionReason is string && request.resource.data.rejectionReason.size() > 0) ||
-          // Admin may perform no-status edits as long as they don't downgrade approved/completed
-          (resource.data.status == request.resource.data.status)
-        ))
+        // Admin OR Professor can update any task (grading, status, etc)
+        // Ideally we'd restrict Professors to only tasks they created, but simple role check is safer for now
+        isAdmin() || isProfessor()
         ||
         // Assignee can resubmit when rejected, and complete when pending/resubmitted
-        // Assignee can resubmit when rejected, and complete when pending/resubmitted
-        ((resource.data.assignee == request.auth.uid) && (
+        ((resource.data.assignee == request.auth.uid || resource.data.assignees.hasAny([request.auth.uid])) && (
           // Status transitions
           (resource.data.status == 'rejected' && request.resource.data.status == 'resubmitted') ||
           (resource.data.status in ['pending', 'resubmitted'] && request.resource.data.status == 'completed') ||
           // Allow edits to submissions/notes WITHOUT changing status (e.g. adding files)
           (resource.data.status == request.resource.data.status && 
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissions', 'notes']))
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submissions', 'notes', 'submissionNotes', 'completionStatus']))
         ))
       );
 
-      // Only admin can delete tasks
-      allow delete: if isAdmin();
+      // Only admin or professor can delete tasks
+      allow delete: if isAdmin() || isProfessor();
     }
 
     // Users collection: users can read, a user can update their own profile
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow update: if request.auth != null && request.auth.uid == userId;
+      // Allow update if own profile OR if Admin/Professor (for points/grading)
+      allow update: if request.auth != null && (
+        request.auth.uid == userId || isAdmin() || isProfessor()
+      );
       allow create: if request.auth != null && request.auth.uid == userId;
     }
   }

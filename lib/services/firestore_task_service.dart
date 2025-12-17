@@ -290,6 +290,7 @@ class FirestoreTaskService extends ChangeNotifier {
       await _firestore.collection('users').doc(userId).update({
         'points': FieldValue.increment(points),
       });
+      debugPrint('SUCCESS: Awarded $points points to user $userId');
     } catch (e) {
       debugPrint('Error awarding points: $e');
     }
