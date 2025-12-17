@@ -168,7 +168,49 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
 
   Widget _buildBody() {
     final status = widget.task.status.toLowerCase();
-    if (status == 'pending') {
+    final hasSubmitted =
+        widget.task.submissions != null &&
+        widget.task.submissions!.containsKey(widget.user.id);
+    final isGraded =
+        widget.task.grades != null &&
+        widget.task.grades!.containsKey(widget.user.id);
+
+    // 1. Completed / Approved / Graded
+    if (status == 'completed' || status == 'approved' || isGraded) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle, size: 64, color: Colors.green),
+            const SizedBox(height: 16),
+            Text(
+              isGraded ? 'Task Graded' : 'Task Completed',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            if (isGraded) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Score: ${widget.task.grades![widget.user.id]!.score} / ${widget.task.grades![widget.user.id]!.maxScore}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Go Back'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 2. Submitted but not graded => Under Review (Pending)
+    // We ignore the global 'pending' status and look at the user's submission
+    if (hasSubmitted) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -184,27 +226,6 @@ class _TaskSubmissionScreenState extends State<TaskSubmissionScreen> {
               'You have already submitted this task.\nPlease wait for the professor to review it.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Go Back'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (status == 'completed' || status == 'approved') {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle, size: 64, color: Colors.green),
-            const SizedBox(height: 16),
-            const Text(
-              'Task Completed',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
             ElevatedButton(

@@ -47,9 +47,15 @@ class _CustomTextFieldState extends State<CustomTextField> {
         labelText: widget.label,
         labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14),
         hintText: widget.hint,
-        hintStyle: TextStyle(color: Colors.grey[400]),
+        hintStyle: TextStyle(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[400]
+              : Colors.grey[600],
+        ),
         filled: true,
-        fillColor: const Color(0xFFF5F6F8), // Very light grey background
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF393E46)
+            : const Color(0xFFF5F6F8), // Adaptive fill color
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16, // Taller input area

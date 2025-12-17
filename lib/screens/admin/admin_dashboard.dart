@@ -9,7 +9,6 @@ import '../../services/firestore_task_service.dart';
 // Actually Task is in user_model.dart?? No, I saw it there. Yes, Task class is in user_model.dart.
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'admin_reports_screen.dart'; // Reports Inbox
 
 class AdminDashboard extends StatefulWidget {
   final User user;
@@ -188,28 +187,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ),
                         Row(
                           children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(30),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.inbox_rounded,
-                                  color: Colors.white,
-                                ),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const AdminReportsScreen(),
-                                    ),
-                                  );
-                                },
-                                tooltip: 'Reports Inbox',
-                              ),
-                            ),
                             const SizedBox(width: 12),
                             Container(
                               padding: const EdgeInsets.all(2),

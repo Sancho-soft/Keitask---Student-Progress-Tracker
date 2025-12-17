@@ -928,48 +928,60 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
     FirestoreTaskService taskService,
     User? effectiveUser,
   ) {
+    final bool hasSubmitted =
+        effectiveUser != null &&
+        task.submissions != null &&
+        task.submissions!.containsKey(effectiveUser.id);
+
+    final bool isGraded =
+        effectiveUser != null &&
+        task.grades != null &&
+        task.grades!.containsKey(effectiveUser.id);
+
     final bool isCompleted = task.status.toLowerCase() == 'completed';
-    final bool isApproved =
-        task.status.toLowerCase() == 'approved' ||
-        (effectiveUser != null &&
-            task.grades != null &&
-            task.grades!.containsKey(effectiveUser.id));
-    final Color iconColor = isCompleted || isApproved
-        ? Colors.green
-        : Colors.blue;
-    final IconData statusIcon = (isCompleted || isApproved)
-        ? Icons.check_circle
-        : Icons.circle_outlined;
 
     final now = DateTime.now();
     final isOverdue = !isCompleted && task.dueDate.isBefore(now);
     final daysUntilDue = task.dueDate.difference(now).inDays;
+    final isRejected = task.status == 'rejected';
 
+    // Status Determination Logic
     String getTaskStatus() {
+      if (isGraded) return 'Graded';
+      if (hasSubmitted) return 'Pending Review';
+
+      // Global status checks (only if relevant to user or if truly global)
+      if (task.status == 'rejected' && hasSubmitted) return 'Returned';
+
       if (isCompleted) return 'Completed';
-      if (isApproved) return 'Approved';
-      if (task.status == 'rejected') return 'Rejected';
-      if (task.status == 'pending') return 'Pending Review';
-      if (task.status == 'assigned') return 'No Submission';
-      if (task.status == 'pending_approval') return 'No Submission';
+
       if (isOverdue) return 'Overdue';
       if (daysUntilDue == 0) return 'Due Today';
       if (daysUntilDue == 1) return 'Due Tomorrow';
-      return 'Ongoing';
+
+      return 'To Do';
     }
 
-    final isRejected = task.status == 'rejected';
     final statusText = getTaskStatus();
-    final isPending = task.status == 'pending';
-    final statusColor = isCompleted
+
+    // Color Logic
+    Color getStatusColor() {
+      if (statusText == 'Graded') return Colors.green;
+      if (statusText == 'Pending Review') return Colors.orange;
+      if (statusText == 'Returned') return Colors.red;
+      if (statusText == 'Completed') return Colors.green;
+      if (statusText == 'Overdue') return Colors.red;
+      if (statusText == 'Due Today') return Colors.blue;
+      return Colors.blue; // To Do / Assigned
+    }
+
+    final statusColor = getStatusColor();
+    final IconData statusIcon = (isGraded || isCompleted)
+        ? Icons.check_circle
+        : Icons.circle_outlined;
+    final Color iconColor = statusIcon == Icons.check_circle
         ? Colors.green
-        : (isApproved
-              ? Colors.green
-              : (isOverdue
-                    ? Colors.red
-                    : (isRejected
-                          ? Colors.red
-                          : (isPending ? Colors.orange : Colors.blue))));
+        : Colors.blue;
 
     final isBookmarked =
         effectiveUser != null &&
@@ -991,7 +1003,7 @@ class _StudentTasksScreenState extends State<StudentTasksScreen> {
             offset: const Offset(0, 4),
           ),
         ],
-        border: isRejected
+        border: statusText == 'Returned'
             ? Border.all(color: Colors.red.withAlpha(100))
             : null,
       ),

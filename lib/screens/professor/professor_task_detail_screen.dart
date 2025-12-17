@@ -547,36 +547,16 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              // Row 2: Reject and Close buttons (side by side)
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
-                        // Reject Logic
-                        Navigator.pop(dialogContext);
-                        _showRejectDialog(context, task.id);
-                      },
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text(
-                        'Reject (Resubmit)',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
+              // Row 2: Close button (full width now since Reject is gone)
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('Close'),
-                    ),
-                  ),
-                ],
+                  child: const Text('Close'),
+                ),
               ),
             ] else ...[
               // For graded submissions, just show Close button
@@ -594,41 +574,6 @@ class _ProfessorTaskDetailScreenState extends State<ProfessorTaskDetailScreen> {
           ],
         );
       },
-    );
-  }
-
-  void _showRejectDialog(BuildContext context, String taskId) {
-    final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject Submission'),
-        content: TextField(
-          controller: reasonController,
-          decoration: const InputDecoration(
-            hintText: 'Enter reason for rejection...',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (reasonController.text.isNotEmpty) {
-                Provider.of<FirestoreTaskService>(
-                  context,
-                  listen: false,
-                ).rejectTask(taskId, reasonController.text);
-                Navigator.pop(ctx);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
     );
   }
 
